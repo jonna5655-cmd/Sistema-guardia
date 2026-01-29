@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel del Camillero</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .card {
+            background: #fff;
+            border-left: 8px solid #3498db; 
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        /* Estilo para casos urgentes */
+        .urgente-flash {
+            border: 3px solid #e74c3c !important;
+            animation: parpadeo 1s infinite;
+        }
+        @keyframes parpadeo {
+            0% { background-color: #fff; }
+            50% { background-color: #ffeded; }
+            100% { background-color: #fff; }
+        }
+        .badge-urgente {
+            background-color: #e74c3c;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            display: block;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 0.8rem;
+        }
+        .tag {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-right: 5px;
+            background: #eee;
+        }
+        .tag-estudio { background: #fff3cd; color: #856404; }
+        .btn-ok {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 12px;
+            width: 100%;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🚚 Pedidos Pendientes</h2>
+        <div id="listaPedidos">
+            <p style="text-align:center;">Conectando con la guardia...</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, onValue, remove, push, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        // CONFIGURACIÓN DE TU FIREBASE
+        const firebaseConfig = {
+            apiKey: "AIzaSyAAaOmAIQ6GorJsSQAiFg-mUpnZJR2ivd4",
+            authDomain: "appguardia-8d02b.firebaseapp.com",
+            databaseURL: "https://appguardia-8d02b-default-rtdb.firebaseio.com",
+            projectId: "appguardia-8d02b",
+            storageBucket: "appguardia-8d02b.firebasestorage.app",
+            messagingSenderId: "830140146359",
+            appId: "1:830140146359:web:dfbac10ec53d7ee76e2332"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const pedidosRef = ref(db, 'pedidos');
+
+        // Variable global temporal para guardar los datos actuales
+        let pedidosActivos = {};
+
+        // ESCUCHAR CAMBIOS EN TIEMPO REAL
+        onValue(pedidosRef, (snapshot) => {
+            const listaDiv = document.getElementById('listaPedidos');
+            listaDiv.innerHTML = ""; 
+            
+            pedidosActivos = snapshot.val(); // Guardamos los datos para usarlos al finalizar
+            
+            if (pedidosActivos) {
+                // Sonido de alerta
+                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
+                audio.play();
+
+                Object.keys(pedidosActivos).forEach(id => {
+                    const p = pedidosActivos[id];
+                    const esUrgente = p.prioridad === "rojo";
+                    
+                    const card = document.createElement('div');
+                    card.className = `card ${esUrgente ? 'urgente-flash' : ''}`;
+                    
+                    card.innerHTML = `
+                        ${esUrgente ? '<span class="badge-urgente">⚠️ ¡TRASLADO URGENTE! ⚠️</span>' : ''}
+                        <div style="display:flex; justify-content:space-between;">
+                            <strong>${p.paciente}</strong>
+                            <span>${p.hora} hs</span>
+                        </div>
+                        <p style="margin: 8px 0;">DNI: ${p.dni}</p>
+                        <div>
+                            <span class="tag tag-estudio">${p.tipo ? p.tipo.toUpperCase() : 'ESTUDIO'}</span>
+                            <span class="tag">${p.traslado || 'S/D'}</span>
+                            ${p.oxigeno === "SI" ? '<span class="tag" style="background:#d1ecf1">O2</span>' : ''}
+                        </div>
+                        <button class="btn-ok" onclick="finalizarPedido('${id}')">✓ FINALIZAR</button>
+                    `;
+                    listaDiv.appendChild(card);
+                });
+            } else {
+                listaDiv.innerHTML = "<p style='text-align:center;'>✅ No hay traslados pendientes.</p>";
+            }
+        });
+
+        // Función para mover al HISTORIAL y borrar de PENDIENTES
+        window.finalizarPedido = function(id) {
+            if(confirm("¿Confirmas que el traslado ha finalizado?")) {
+                const datosDelPedido = pedidosActivos[id];
+                const historialRef = ref(db, 'historial');
+
+                // Preparamos el registro para el historial
+                const registroFinal = {
+                    ...datosDelPedido,
+                    horaFinalizado: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                    fechaFinalizado: new Date().toLocaleDateString(),
+                    timestampServer: serverTimestamp()
+                };
+
+                // 1. Guardar en carpeta historial
+                push(historialRef, registroFinal)
+                    .then(() => {
+                        // 2. Si se guardó bien, borrar de pedidos pendientes
+                        const itemRef = ref(db, 'pedidos/' + id);
+                        remove(itemRef);
+                    })
+                    .catch((error) => {
+                        alert("Error al archivar: " + error.message);
+                    });
+            }
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Traslados - Guardia</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body { background-color: #f4f7f6; font-family: sans-serif; }
+        .container-historial { max-width: 1000px; margin: 20px auto; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { color: #2c3e50; text-align: center; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        
+        .stats { display: flex; justify-content: space-around; margin-bottom: 20px; background: #e8f4fd; padding: 15px; border-radius: 8px; }
+        .stat-box { text-align: center; }
+        .stat-number { display: block; font-size: 1.8rem; font-weight: bold; color: #1a73e8; }
+        .stat-label { font-size: 0.9rem; color: #666; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        th { background-color: #3498db; color: white; padding: 12px; text-align: left; }
+        td { padding: 10px; border-bottom: 1px solid #eee; }
+        tr:hover { background-color: #f9f9f9; }
+        
+        .badge { padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.75rem; }
+        .badge-rojo { background: #ffcccc; color: #cc0000; }
+        .badge-verde { background: #ccffcc; color: #006600; }
+        
+        @media (max-width: 600px) {
+            table { font-size: 0.7rem; }
+            th, td { padding: 5px; }
+            .stats { flex-direction: column; gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container-historial">
+    <h2>📊 Historial de Traslados Realizados</h2>
+
+    <div class="stats">
+        <div class="stat-box">
+            <span class="stat-number" id="countTotal">0</span>
+            <span class="stat-label">Total Hoy</span>
+        </div>
+        <div class="stat-box">
+            <span class="stat-number" id="countUrgentes" style="color: #e74c3c;">0</span>
+            <span class="stat-label">Urgencias</span>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Paciente / DNI</th>
+                <th>Estudio</th>
+                <th>Pedido</th>
+                <th>Finalizado</th>
+                <th>Prioridad</th>
+            </tr>
+        </thead>
+        <tbody id="tablaCuerpo">
+            </tbody>
+    </table>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAAaOmAIQ6GorJsSQAiFg-mUpnZJR2ivd4",
+        authDomain: "appguardia-8d02b.firebaseapp.com",
+        databaseURL: "https://appguardia-8d02b-default-rtdb.firebaseio.com",
+        projectId: "appguardia-8d02b",
+        storageBucket: "appguardia-8d02b.firebasestorage.app",
+        messagingSenderId: "830140146359",
+        appId: "1:830140146359:web:dfbac10ec53d7ee76e2332"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const historialRef = ref(db, 'historial');
+
+    onValue(historialRef, (snapshot) => {
+        const cuerpo = document.getElementById('tablaCuerpo');
+        const countTotal = document.getElementById('countTotal');
+        const countUrgentes = document.getElementById('countUrgentes');
+        
+        cuerpo.innerHTML = "";
+        const data = snapshot.val();
+
+        if (data) {
+            const lista = Object.values(data).reverse(); // Mostrar el más reciente primero
+            countTotal.innerText = lista.length;
+            
+            let urgentes = 0;
+
+            lista.forEach(p => {
+                if(p.prioridad === 'rojo') urgentes++;
+
+                const fila = document.createElement('tr');
+                fila.innerHTML = `
+                    <td><strong>${p.paciente}</strong><br><small>${p.dni}</small></td>
+                    <td>${p.tipo.toUpperCase()}<br><small>${p.region}</small></td>
+                    <td>${p.hora} hs</td>
+                    <td>${p.horaFinalizado} hs</td>
+                    <td>
+                        <span class="badge ${p.prioridad === 'rojo' ? 'badge-rojo' : 'badge-verde'}">
+                            ${p.prioridad.toUpperCase()}
+                        </span>
+                    </td>
+                `;
+                cuerpo.appendChild(fila);
+            });
+            countUrgentes.innerText = urgentes;
+        } else {
+            cuerpo.innerHTML = "<tr><td colspan='5' style='text-align:center;'>No hay registros aún.</td></tr>";
+        }
+    });
+</script>
+
+</body>
+</html>

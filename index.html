@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pedido de Traslado - Guardia</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h2>📋 Nuevo Pedido de Estudio</h2>
+        <form id="pedidoForm">
+            <div class="section">
+                <input type="text" id="nombreInput" placeholder="Nombre y Apellido" required>
+                <input type="number" id="dniInput" placeholder="DNI" required>
+                <input type="time" id="horaPedido" readonly>
+            </div>
+
+            <div class="section">
+                <label>Tipo de Estudio (Obligatorio):</label>
+                <div class="radio-group">
+                    <input type="radio" name="tipo" value="rx" id="optRx"> RX
+                    <input type="radio" name="tipo" value="tac" id="optTac"> TAC
+                </div>
+            </div>
+
+            <div id="divTac" class="hidden sub-section">
+                <label>Región TAC:</label>
+                <select id="regTac">
+                    <option value="Encéfalo">Encéfalo</option>
+                    <option value="Tórax">Tórax</option>
+                    <option value="Abdomen">Abdomen</option>
+                </select>
+                <label><input type="checkbox" id="conContraste"> Con Contraste</label>
+            </div>
+
+            <div id="divRx" class="hidden sub-section">
+                <label>Región RX:</label>
+                <select id="regRx">
+                    <option value="Tórax">Tórax</option>
+                    <option value="Abdomen">Abdomen</option>
+                    <option value="Cráneo">Cráneo</option>
+                    <option value="Miembros">Miembros</option>
+                </select>
+                <div class="radio-group">
+                    <label><input type="radio" name="rx_tipo" value="Frente"> Frente</label>
+                    <label><input type="radio" name="rx_tipo" value="Perfil"> Perfil</label>
+                    <label><input type="radio" name="rx_tipo" value="Ambas" checked> Ambas</label>
+                </div>
+            </div>
+
+            <div class="section logistics">
+                <label>Traslado en:</label>
+                <select id="trasladoInput">
+                    <option value="Silla de Ruedas">Silla de Ruedas</option>
+                    <option value="Camilla">Camilla</option>
+                </select>
+                <label class="switch">
+                    <input type="checkbox" id="oxigenoInput"> ¿Requiere Oxígeno?
+                </label>
+            </div>
+            
+            <div class="section">
+    <label>Prioridad del Traslado:</label>
+    <select id="prioridadSelect" style="font-weight: bold;">
+        <option value="verde" style="color: green;">🟢 Rutina (Verde)</option>
+        <option value="rojo" style="color: red;">🔴 URGENTE (Rojo)</option>
+    </select>
+</div>
+
+
+            <button type="button" class="btn-enviar" id="btnEnviar">ENVIAR AL CAMILLERO</button>
+        </form>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAAaOmAIQ6GorJsSQAiFg-mUpnZJR2ivd4",
+            authDomain: "appguardia-8d02b.firebaseapp.com",
+            databaseURL: "https://appguardia-8d02b-default-rtdb.firebaseio.com",
+            projectId: "appguardia-8d02b",
+            storageBucket: "appguardia-8d02b.firebasestorage.app",
+            messagingSenderId: "830140146359",
+            appId: "1:830140146359:web:dfbac10ec53d7ee76e2332"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // Actualizar hora automáticamente cada vez que se carga la página
+        document.getElementById('horaPedido').value = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+        // Manejo de mostrar/ocultar secciones
+        const optRx = document.getElementById('optRx');
+        const optTac = document.getElementById('optTac');
+        const divRx = document.getElementById('divRx');
+        const divTac = document.getElementById('divTac');
+
+        optRx.addEventListener('change', () => { divRx.classList.remove('hidden'); divTac.classList.add('hidden'); });
+        optTac.addEventListener('change', () => { divTac.classList.remove('hidden'); divRx.classList.add('hidden'); });
+
+        // Función Principal: Enviar Alerta con VALIDACIÓN
+        document.getElementById('btnEnviar').addEventListener('click', () => {
+            const nombre = document.getElementById('nombreInput').value.trim();
+            const dni = document.getElementById('dniInput').value.trim();
+            const hora = document.getElementById('horaPedido').value;
+            const tipo = document.querySelector('input[name="tipo"]:checked')?.value;
+            const traslado = document.getElementById('trasladoInput').value;
+            const oxigeno = document.getElementById('oxigenoInput').checked ? "SI" : "NO";
+            
+          const nuevoPedido = {
+    // ... otros campos ...
+    prioridad: document.getElementById('prioridadSelect').value,
+    estado: "Pendiente"
+};
+ 
+
+            // --- VALIDACIONES ---
+            if (!nombre || !dni) {
+                alert("❌ Por favor, completa Nombre y DNI del paciente.");
+                return;
+            }
+            if (!tipo) {
+                alert("❌ Debes seleccionar el tipo de estudio (RX o TAC).");
+                return;
+            }
+
+            // Recolectar datos específicos según el estudio
+            let region = "";
+            let detalle = "";
+
+            if (tipo === 'rx') {
+                region = document.getElementById('regRx').value;
+                detalle = document.querySelector('input[name="rx_tipo"]:checked')?.value || "Ambas";
+            } else {
+                region = document.getElementById('regTac').value;
+                detalle = document.getElementById('conContraste').checked ? "Con Contraste" : "Sin Contraste";
+            }
+
+            // Objeto final para Firebase
+            const pedido = {
+                paciente: nombre,
+                dni: dni,
+                hora: hora,
+                tipo: tipo,
+                region: region,
+                detalle: detalle,
+                traslado: traslado,
+                oxigeno: oxigeno,
+                timestamp: Date.now()
+            };
+
+            // Enviar a Firebase
+            push(ref(db, 'pedidos'), pedido)
+                .then(() => {
+                    alert("🚀 ¡Pedido enviado con éxito!");
+                    document.getElementById('pedidoForm').reset();
+                    document.getElementById('horaPedido').value = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    divRx.classList.add('hidden');
+                    divTac.classList.add('hidden');
+                })
+                .catch(error => alert("Error al enviar: " + error.message));
+        });
+    </script>
+</body>
+</html>
