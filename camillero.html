@@ -3,59 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel del Camillero</title>
+    <title>Panel Camillero - Gestión de Turnos</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
+        :root {
+            --primary: #2c3e50;
+            --accent: #3498db;
+            --urgente: #e74c3c;
+            --franquero: #8e44ad;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
         .container { max-width: 500px; margin: auto; }
-        h2 { text-align: center; color: #2c3e50; }
         
+        .header-status { 
+            background: var(--primary); color: white; padding: 15px; 
+            border-radius: 12px; text-align: center; margin-bottom: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .badge-dia {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin-top: 5px;
+            background: rgba(255,255,255,0.2);
+        }
+
         .card {
-            background: #fff;
-            border-left: 8px solid #3498db; 
-            margin: 15px 0;
-            padding: 20px;
-            border-radius: 12px;
+            background: #fff; border-left: 8px solid var(--accent); 
+            margin: 15px 0; padding: 20px; border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
+        .urgente-flash { border: 3px solid var(--urgente) !important; animation: parpadeo 1.5s infinite; }
+        @keyframes parpadeo { 0% { background-color: #fff; } 50% { background-color: #ffeaea; } 100% { background-color: #fff; } }
 
-        .urgente-flash {
-            border: 3px solid #e74c3c !important;
-            animation: parpadeo 1.5s infinite;
-        }
-        @keyframes parpadeo {
-            0% { background-color: #fff; }
-            50% { background-color: #ffeaea; }
-            100% { background-color: #fff; }
-        }
-
-        .badge-urgente {
-            background-color: #e74c3c; color: white; padding: 8px; border-radius: 6px;
-            font-weight: bold; display: block; text-align: center; margin-bottom: 12px; font-size: 0.9rem;
-        }
-
-        .paciente-nombre { font-size: 1.2rem; font-weight: bold; color: #333; }
-        .hora-texto { color: #666; font-weight: bold; }
-        .dni-texto { margin: 10px 0; color: #555; font-size: 0.95rem; }
-
-        .tags-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .tag { padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; margin-right: 5px; border: 1px solid #ddd; }
+        .tag-oxigeno { background: #d1ecf1; color: #0c5460; }
         
-        .tag { padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; border: 1px solid rgba(0,0,0,0.1); }
-        .tag-estudio { background: #fff3cd; color: #856404; }
-        .tag-traslado { background: #d4edda; color: #155724; }
-        .tag-oxigeno { background: #d1ecf1; color: #0c5460; border-color: #bee5eb; }
-        .tag-no-oxigeno { background: #e2e3e5; color: #383d41; }
-
         .btn-ok {
             background: #28a745; color: white; border: none; padding: 14px; width: 100%;
-            border-radius: 8px; margin-top: 15px; font-weight: bold; font-size: 1rem; cursor: pointer;
+            border-radius: 8px; margin-top: 15px; font-weight: bold; cursor: pointer;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>⏰ Pedidos Pendientes</h2>
+        <div class="header-status">
+            <div id="reloj" style="font-size: 1.2rem; font-weight: bold;">00:00:00</div>
+            <div id="fechaActual" style="font-size: 0.9rem; opacity: 0.8;">--/--/--</div>
+            <div id="infoTurno" class="badge-dia">Detectando Turno...</div>
+        </div>
+
+        <h2 style="color: var(--primary); text-align: center;">⏰ Pedidos Activos</h2>
         <div id="listaPedidos">
-            <p style="text-align:center;">Conectando con Firebase...</p>
+            <p style="text-align:center; color: #666;">Cargando pedidos...</p>
         </div>
     </div>
 
@@ -77,73 +78,143 @@
         const db = getDatabase(app);
         const pedidosRef = ref(db, 'pedidos');
 
-        let pedidosActivos = {};
+        // Lista de Feriados Argentina 2025 (puedes actualizarla año a año)
+        const feriadosArg = ["2025-01-01", "2025-03-03", "2025-03-04", "2025-03-24", "2025-04-02", "2025-04-18", "2025-05-01", "2025-05-25", "2025-06-16", "2025-06-20", "2025-07-09", "2025-08-15", "2025-10-12", "2025-11-20", "2025-12-08", "2025-12-25"];
+
+        function esFranquero() {
+            const hoy = new Date();
+            const diaSemana = hoy.getDay(); // 0 es Domingo, 6 es Sábado
+            const fechaString = hoy.toISOString().split('T')[0];
+            return (diaSemana === 0 || diaSemana === 6 || feriadosArg.includes(fechaString));
+        }
+
+        function obtenerTurnoActual() {
+            const h = new Date().getHours();
+            const esFinde = esFranquero();
+
+            if (esFinde && h >= 7 && h < 21) return "FRANQUERO";
+            if (h >= 7 && h < 14) return "MAÑANA";
+            if (h >= 14 && h < 21) return "TARDE";
+            return "NOCHE";
+        }
+
+        setInterval(() => {
+            const ahora = new Date();
+            document.getElementById('reloj').innerText = ahora.toLocaleTimeString();
+            document.getElementById('fechaActual').innerText = ahora.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            document.getElementById('infoTurno').innerText = "TURNO: " + obtenerTurnoActual();
+        }, 1000);
+
+        let pedidosActuales = {};
 
         onValue(pedidosRef, (snapshot) => {
+            pedidosActuales = snapshot.val();
             const listaDiv = document.getElementById('listaPedidos');
-            listaDiv.innerHTML = ""; 
-            pedidosActivos = snapshot.val();
+            listaDiv.innerHTML = "";
             
-            if (pedidosActivos) {
-                Object.keys(pedidosActivos).forEach(id => {
-                    const p = pedidosActivos[id];
-                    
-                    // --- CORRECCIÓN DE VARIABLES ---
-                    const nombre = p.paciente || p.nombre || "Sin Nombre";
-                    const dni = p.dni || p.documento || "S/D";
-                    const hora = p.hora || p.horario || "--:--";
-                    const estudio = p.estudio || p.tipo || "ESTUDIO";
-                    
-                    // Busca el tipo de traslado (Silla o Camilla)
-                    const traslado = p.traslado || p.metodo || p.transporte || "TRASLADO";
-                    
-                    // Lógica para el Oxígeno: detecta "SI", "si", o true
-                    const tieneOxigeno = (String(p.oxigeno).toUpperCase() === "SI" || p.oxigeno === true);
+            const turno = obtenerTurnoActual();
 
-                    // Prioridad
-                    const esUrgente = (p.prioridad === "rojo" || p.urgencia === "SI");
+            if (pedidosActuales) {
+                let hayPedidos = false;
+                Object.keys(pedidosActuales).forEach(id => {
+                    const p = pedidosActuales[id];
+                    const hPedido = parseInt(p.hora.split(":")[0]);
+                    let mostrar = false;
 
-                    const card = document.createElement('div');
-                    card.className = `card ${esUrgente ? 'urgente-flash' : ''}`;
-                    
-                    card.innerHTML = `
-                        ${esUrgente ? '<span class="badge-urgente">⚠️ ¡TRASLADO URGENTE! ⚠️</span>' : ''}
-                        <div style="display:flex; justify-content:space-between; align-items: center;">
-                            <span class="paciente-nombre">${nombre}</span>
-                            <span class="hora-texto">${hora} hs</span>
-                        </div>
-                        <p class="dni-texto"><strong>DNI:</strong> ${dni}</p>
-                        
-                        <div class="tags-container">
-                            <span class="tag tag-estudio">📋 ${estudio}</span>
-                            <span class="tag tag-traslado">🚑 ${traslado}</span>
-                            <span class="tag ${tieneOxigeno ? 'tag-oxigeno' : 'tag-no-oxigeno'}">
-                                ${tieneOxigeno ? '💧 OXÍGENO: SÍ' : 'SIN OXÍGENO'}
-                            </span>
-                        </div>
+                    // Lógica de filtrado por turno
+                    if (turno === "FRANQUERO") {
+                        if (hPedido >= 7 && hPedido < 21) mostrar = true;
+                    } else if (turno === "MAÑANA") {
+                        if (hPedido >= 7 && hPedido < 14) mostrar = true;
+                    } else if (turno === "TARDE") {
+                        if (hPedido >= 14 && hPedido < 21) mostrar = true;
+                    } else { // NOCHE
+                        if (hPedido >= 21 || hPedido < 7) mostrar = true;
+                    }
 
-                        <button class="btn-ok" onclick="finalizarPedido('${id}')">✓ FINALIZAR TRASLADO</button>
-                    `;
-                    listaDiv.appendChild(card);
+                    if (mostrar) {
+                        hayPedidos = true;
+                        const esUrgente = p.prioridad === "rojo";
+                        const card = document.createElement('div');
+                        card.className = `card ${esUrgente ? 'urgente-flash' : ''}`;
+                        card.innerHTML = `
+                            <div style="display:flex; justify-content:space-between;">
+                                <strong>${p.paciente}</strong>
+                                <span>${p.hora} hs</span>
+                            </div>
+                            <p>DNI: ${p.dni}</p>
+                            <div style="margin-top:10px;">
+                                <span class="tag" style="background:#fff3cd;">${p.estudio || 'Estudio'}</span><br><br>
+                                <span class="tag">${p.traslado || 'S/D'}</span>
+                                ${p.oxigeno === "SI" ? '<span class="tag tag-oxigeno">💧 O2</span>' : ''} 
+                            </div>
+                            <button class="btn-ok" onclick="finalizarPedido('${id}')">✓ FINALIZAR</button>
+                        `;
+                        listaDiv.appendChild(card);
+                    }
                 });
+                if (!hayPedidos) listaDiv.innerHTML = "<p style='text-align:center;'>✅ Sin traslados en este turno.</p>";
             } else {
                 listaDiv.innerHTML = "<p style='text-align:center;'>✅ No hay traslados pendientes.</p>";
             }
         });
+        
+        // Registro del Service Worker
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('Service Worker registrado con éxito', reg))
+            .catch(err => console.log('Error al registrar Service Worker', err));
+    });
+}
+
+       // --- FUNCIÓN DE NOTIFICACIÓN CONSOLIDADA ---
+function enviarNotificacion(paciente, estudio, prioridad) {
+    const esRojo = prioridad === "rojo";
+
+    // 1. POP-UP VISUAL (El cartel que baja en la pantalla)
+    const pop = document.getElementById('popupAlerta');
+    document.getElementById('popPaciente').innerHTML = `<strong>Paciente:</strong> ${paciente}`;
+    document.getElementById('popEstudio').innerHTML = `<strong>Estudio:</strong> ${estudio}`;
+    
+    if (esRojo) {
+        pop.classList.add('alerta-urgente');
+        pop.querySelector('h3').innerText = "🚨 ¡URGENCIA MÉDICA!";
+    } else {
+        pop.classList.remove('alerta-urgente');
+        pop.querySelector('h3').innerText = "📋 NUEVO PEDIDO";
+    }
+    pop.classList.add('show');
+
+    // 2. NOTIFICACIÓN DE SISTEMA (Vía Service Worker)
+    // Esto es lo que permite que se vea fuera del navegador
+    if (Notification.permission === "granted") {
+        navigator.serviceWorker.ready.then(registration => {
+            registration.showNotification(esRojo ? "🚨 URGENCIA" : "🚑 NUEVO TRASLADO", {
+                body: `Paciente: ${paciente}\nEstudio: ${estudio}`,
+                icon: "https://cdn-icons-png.flaticon.com/512/822/822143.png",
+                vibrate: [300, 100, 300],
+                tag: "pedido-" + Date.now(),
+                renotify: true
+            });
+        });
+    }
+
+    // 3. SONIDO
+    const sonido = new Audio(esRojo ? 
+        'https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3' : 
+        'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'
+    );
+    sonido.play().catch(e => console.warn("Sonido bloqueado hasta interacción"));
+}
+
+
 
         window.finalizarPedido = function(id) {
-            if(confirm("¿Confirmar finalización del traslado?")) {
+            if(confirm("¿Confirmas finalización?")) {
                 const historialRef = ref(db, 'historial');
-                const registroFinal = {
-                    ...pedidosActivos[id],
-                    horaFinalizado: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-                    fechaFinalizado: new Date().toLocaleDateString(),
-                    timestampServer: serverTimestamp()
-                };
-
-                push(historialRef, registroFinal).then(() => {
-                    remove(ref(db, 'pedidos/' + id));
-                });
+                const registroFinal = { ...pedidosActuales[id], fechaFinalizado: new Date().toLocaleDateString(), timestampServer: serverTimestamp() };
+                push(historialRef, registroFinal).then(() => remove(ref(db, 'pedidos/' + id)));
             }
         };
     </script>
