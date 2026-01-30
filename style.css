@@ -17,6 +17,12 @@ body {
 
 h2 { color: #1a73e8; text-align: center; font-size: 1.2rem; }
 
+#horaPedido {
+  opacity: 0;
+  pointer-events: none; /* Opcional: evita que el usuario interactúe con él por error */
+}
+
+
 .section { margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
 
 input[type="text"], input[type="number"], input[type="time"], select {
