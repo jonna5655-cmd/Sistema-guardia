@@ -4,7 +4,7 @@
    - Gestiona el caché para funcionamiento estable
 */
 
-const CACHE_NAME = 'camilleros-v1';
+const CACHE_NAME = 'camilleros-v2';
 const ASSETS_TO_CACHE = [
     './',
     './camillero.html',
