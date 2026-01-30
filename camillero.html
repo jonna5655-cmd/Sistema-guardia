@@ -3,133 +3,149 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel Camillero - Disponibilidad</title>
+    <title>Panel del Camillero</title>
     <style>
-        :root { --primary: #2c3e50; --success: #28a745; --danger: #dc3545; }
-        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; margin: 0; padding: 15px; }
-        .container { max-width: 450px; margin: auto; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
+        .container { max-width: 500px; margin: auto; }
+        h2 { text-align: center; color: #2c3e50; }
         
-        .status-header { 
-            background: white; padding: 20px; border-radius: 15px; text-align: center;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 20px;
-        }
-
-        /* Botón de Disponibilidad */
-        .btn-status {
-            width: 100%; padding: 15px; border: none; border-radius: 10px;
-            font-size: 1.2rem; font-weight: bold; cursor: pointer; color: white;
-            transition: 0.3s; margin-top: 10px;
-        }
-        .disponible { background: var(--success); box-shadow: 0 4px 0 #1e7e34; }
-        .inactivo { background: var(--danger); box-shadow: 0 4px 0 #bd2130; }
-
         .card {
-            background: white; border-radius: 12px; padding: 15px; margin-bottom: 15px;
-            border-left: 8px solid #3498db; box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-            box-sizing: border-box; /* Fix margen */
+            background: #fff;
+            border-left: 8px solid #3498db; 
+            margin: 15px 0;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
-        .urgente { border-color: var(--danger); animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { background: #fff; } 50% { background: #fff5f5; } 100% { background: #fff; } }
+
+        .urgente-flash {
+            border: 3px solid #e74c3c !important;
+            animation: parpadeo 1.5s infinite;
+        }
+        @keyframes parpadeo {
+            0% { background-color: #fff; }
+            50% { background-color: #ffeaea; }
+            100% { background-color: #fff; }
+        }
+
+        .badge-urgente {
+            background-color: #e74c3c; color: white; padding: 8px; border-radius: 6px;
+            font-weight: bold; display: block; text-align: center; margin-bottom: 12px; font-size: 0.9rem;
+        }
+
+        .paciente-nombre { font-size: 1.2rem; font-weight: bold; color: #333; }
+        .hora-texto { color: #666; font-weight: bold; }
+        .dni-texto { margin: 10px 0; color: #555; font-size: 0.95rem; }
 
         .tags-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-        .tag { padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; background: #eee; white-space: nowrap; }
-        .tag-o2 { background: #d1ecf1; color: #0c5460; }
+        
+        .tag { padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; border: 1px solid rgba(0,0,0,0.1); }
         .tag-estudio { background: #fff3cd; color: #856404; }
+        .tag-traslado { background: #d4edda; color: #155724; }
+        .tag-oxigeno { background: #d1ecf1; color: #0c5460; border-color: #bee5eb; }
+        .tag-no-oxigeno { background: #e2e3e5; color: #383d41; }
 
-        .btn-finalizar { background: var(--success); color: white; border: none; width: 100%; padding: 12px; border-radius: 8px; margin-top: 15px; font-weight: bold; cursor: pointer; }
+        .btn-ok {
+            background: #28a745; color: white; border: none; padding: 14px; width: 100%;
+            border-radius: 8px; margin-top: 15px; font-weight: bold; font-size: 1rem; cursor: pointer;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="status-header">
-            <div id="reloj" style="font-size: 1.4rem; font-weight: bold;">00:00:00</div>
-            <button id="btnToggleStatus" class="btn-status inactivo">INACTIVO</button>
-            <p id="labelStatus" style="margin-top: 8px; font-size: 0.9rem; font-weight: bold; color: #666;">Turno fuera de línea</p>
+        <h2>⏰ Pedidos Pendientes</h2>
+        <div id="listaPedidos">
+            <p style="text-align:center;">Conectando con Firebase...</p>
         </div>
-
-        <div id="listaPedidos"></div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, onValue, set, remove, push, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getDatabase, ref, onValue, remove, push, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAAaOmAIQ6GorJsSQAiFg-mUpnZJR2ivd4",
             authDomain: "appguardia-8d02b.firebaseapp.com",
             databaseURL: "https://appguardia-8d02b-default-rtdb.firebaseio.com",
-            projectId: "appguardia-8d02b"
+            projectId: "appguardia-8d02b",
+            storageBucket: "appguardia-8d02b.firebasestorage.app",
+            messagingSenderId: "830140146359",
+            appId: "1:830140146359:web:dfbac10ec53d7ee76e2332"
         };
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
-        const statusRef = ref(db, 'config/estadoTurno');
         const pedidosRef = ref(db, 'pedidos');
 
-        let isAvailable = false;
-        let pedidosActuales = {};
+        let pedidosActivos = {};
 
-        // Manejo del botón de Disponibilidad
-        const btn = document.getElementById('btnToggleStatus');
-        btn.addEventListener('click', () => {
-            isAvailable = !isAvailable;
-            set(statusRef, isAvailable);
-        });
-
-        // Escuchar estado global
-        onValue(statusRef, (snapshot) => {
-            isAvailable = snapshot.val() || false;
-            btn.innerText = isAvailable ? "DISPONIBLE" : "INACTIVO";
-            btn.className = `btn-status ${isAvailable ? 'disponible' : 'inactivo'}`;
-            document.getElementById('labelStatus').innerText = isAvailable ? "Recibiendo pedidos de este turno" : "Turno cerrado / Fuera de servicio";
-            renderizar();
-        });
-
-        // Escuchar pedidos
         onValue(pedidosRef, (snapshot) => {
-            pedidosActuales = snapshot.val();
-            renderizar();
-        });
-
-        function renderizar() {
             const listaDiv = document.getElementById('listaPedidos');
-            listaDiv.innerHTML = "";
-            if (!isAvailable) {
-                listaDiv.innerHTML = "<p style='text-align:center; color:gray;'>Debes estar DISPONIBLE para ver pedidos.</p>";
-                return;
-            }
-            if (pedidosActuales) {
-                Object.keys(pedidosActuales).forEach(id => {
-                    const p = pedidosActuales[id];
+            listaDiv.innerHTML = ""; 
+            pedidosActivos = snapshot.val();
+            
+            if (pedidosActivos) {
+                Object.keys(pedidosActivos).forEach(id => {
+                    const p = pedidosActivos[id];
+                    
+                    // --- CORRECCIÓN DE VARIABLES ---
+                    const nombre = p.paciente || p.nombre || "Sin Nombre";
+                    const dni = p.dni || p.documento || "S/D";
+                    const hora = p.hora || p.horario || "--:--";
+                    const estudio = p.estudio || p.tipo || "ESTUDIO";
+                    
+                    // Busca el tipo de traslado (Silla o Camilla)
+                    const traslado = p.traslado || p.metodo || p.transporte || "TRASLADO";
+                    
+                    // Lógica para el Oxígeno: detecta "SI", "si", o true
+                    const tieneOxigeno = (String(p.oxigeno).toUpperCase() === "SI" || p.oxigeno === true);
+
+                    // Prioridad
+                    const esUrgente = (p.prioridad === "rojo" || p.urgencia === "SI");
+
                     const card = document.createElement('div');
-                    card.className = `card ${p.prioridad === 'rojo' ? 'urgente' : ''}`;
+                    card.className = `card ${esUrgente ? 'urgente-flash' : ''}`;
+                    
                     card.innerHTML = `
-                        <div style="display:flex; justify-content:space-between; font-weight:bold;">
-                            <span>${p.paciente}</span><span>${p.hora} hs</span>
+                        ${esUrgente ? '<span class="badge-urgente">⚠️ ¡TRASLADO URGENTE! ⚠️</span>' : ''}
+                        <div style="display:flex; justify-content:space-between; align-items: center;">
+                            <span class="paciente-nombre">${nombre}</span>
+                            <span class="hora-texto">${hora} hs</span>
                         </div>
-                        <div style="font-size:0.9rem; margin: 5px 0;">DNI: ${p.dni}</div>
+                        <p class="dni-texto"><strong>DNI:</strong> ${dni}</p>
+                        
                         <div class="tags-container">
-                            <span class="tag tag-estudio">${p.estudio}</span>
-                            <span class="tag">${p.traslado}</span>
-                            ${p.oxigeno === 'SI' ? '<span class="tag tag-o2">💧 O2: SÍ</span>' : ''}
+                            <span class="tag tag-estudio">📋 ${estudio}</span>
+                            <span class="tag tag-traslado">🚑 ${traslado}</span>
+                            <span class="tag ${tieneOxigeno ? 'tag-oxigeno' : 'tag-no-oxigeno'}">
+                                ${tieneOxigeno ? '💧 OXÍGENO: SÍ' : 'SIN OXÍGENO'}
+                            </span>
                         </div>
-                        <button class="btn-finalizar" onclick="finalizar('${id}')">✓ FINALIZAR</button>
+
+                        <button class="btn-ok" onclick="finalizarPedido('${id}')">✓ FINALIZAR TRASLADO</button>
                     `;
                     listaDiv.appendChild(card);
                 });
+            } else {
+                listaDiv.innerHTML = "<p style='text-align:center;'>✅ No hay traslados pendientes.</p>";
             }
-        }
+        });
 
-        window.finalizar = (id) => {
-            if(confirm("¿Traslado finalizado?")) {
-                const histRef = ref(db, 'historial');
-                push(histRef, {...pedidosActuales[id], timestampServer: serverTimestamp()}).then(() => {
+        window.finalizarPedido = function(id) {
+            if(confirm("¿Confirmar finalización del traslado?")) {
+                const historialRef = ref(db, 'historial');
+                const registroFinal = {
+                    ...pedidosActivos[id],
+                    horaFinalizado: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                    fechaFinalizado: new Date().toLocaleDateString(),
+                    timestampServer: serverTimestamp()
+                };
+
+                push(historialRef, registroFinal).then(() => {
                     remove(ref(db, 'pedidos/' + id));
                 });
             }
         };
-
-        setInterval(() => { document.getElementById('reloj').innerText = new Date().toLocaleTimeString(); }, 1000);
     </script>
 </body>
 </html>
