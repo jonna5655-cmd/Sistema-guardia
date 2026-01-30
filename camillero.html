@@ -4,57 +4,50 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel del Camillero</title>
-    <link rel="stylesheet" href="style.css">
     <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
+        .container { max-width: 500px; margin: auto; }
+        h2 { text-align: center; color: #2c3e50; }
+        
         .card {
             background: #fff;
             border-left: 8px solid #3498db; 
             margin: 15px 0;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
-        /* Estilo para casos urgentes */
+
         .urgente-flash {
             border: 3px solid #e74c3c !important;
-            animation: parpadeo 1s infinite;
+            animation: parpadeo 1.5s infinite;
         }
         @keyframes parpadeo {
             0% { background-color: #fff; }
-            50% { background-color: #ffeded; }
+            50% { background-color: #ffeaea; }
             100% { background-color: #fff; }
         }
+
         .badge-urgente {
-            background-color: #e74c3c;
-            color: white;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-weight: bold;
-            display: block;
-            text-align: center;
-            margin-bottom: 10px;
-            font-size: 0.8rem;
+            background-color: #e74c3c; color: white; padding: 8px; border-radius: 6px;
+            font-weight: bold; display: block; text-align: center; margin-bottom: 12px; font-size: 0.9rem;
         }
-        .tag {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.8rem;
-            font-weight: bold;
-            margin-right: 5px;
-            background: #eee;
-        }
+
+        .paciente-nombre { font-size: 1.2rem; font-weight: bold; color: #333; }
+        .hora-texto { color: #666; font-weight: bold; }
+        .dni-texto { margin: 10px 0; color: #555; font-size: 0.95rem; }
+
+        .tags-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        
+        .tag { padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; border: 1px solid rgba(0,0,0,0.1); }
         .tag-estudio { background: #fff3cd; color: #856404; }
+        .tag-traslado { background: #d4edda; color: #155724; }
+        .tag-oxigeno { background: #d1ecf1; color: #0c5460; border-color: #bee5eb; }
+        .tag-no-oxigeno { background: #e2e3e5; color: #383d41; }
+
         .btn-ok {
-            background: #28a745;
-            color: white;
-            border: none;
-            padding: 12px;
-            width: 100%;
-            border-radius: 5px;
-            margin-top: 10px;
-            font-weight: bold;
-            cursor: pointer;
+            background: #28a745; color: white; border: none; padding: 14px; width: 100%;
+            border-radius: 8px; margin-top: 15px; font-weight: bold; font-size: 1rem; cursor: pointer;
         }
     </style>
 </head>
@@ -62,7 +55,7 @@
     <div class="container">
         <h2>⏰ Pedidos Pendientes</h2>
         <div id="listaPedidos">
-            <p style="text-align:center;">Conectando con la guardia...</p>
+            <p style="text-align:center;">Conectando con Firebase...</p>
         </div>
     </div>
 
@@ -70,7 +63,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getDatabase, ref, onValue, remove, push, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-        // CONFIGURACIÓN DE TU FIREBASE
         const firebaseConfig = {
             apiKey: "AIzaSyAAaOmAIQ6GorJsSQAiFg-mUpnZJR2ivd4",
             authDomain: "appguardia-8d02b.firebaseapp.com",
@@ -85,41 +77,52 @@
         const db = getDatabase(app);
         const pedidosRef = ref(db, 'pedidos');
 
-        // Variable global temporal para guardar los datos actuales
         let pedidosActivos = {};
 
-        // ESCUCHAR CAMBIOS EN TIEMPO REAL
         onValue(pedidosRef, (snapshot) => {
             const listaDiv = document.getElementById('listaPedidos');
             listaDiv.innerHTML = ""; 
-            
-            pedidosActivos = snapshot.val(); // Guardamos los datos para usarlos al finalizar
+            pedidosActivos = snapshot.val();
             
             if (pedidosActivos) {
-                // Sonido de alerta
-                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
-                audio.play();
-
                 Object.keys(pedidosActivos).forEach(id => {
                     const p = pedidosActivos[id];
-                    const esUrgente = p.prioridad === "rojo";
                     
+                    // --- CORRECCIÓN DE VARIABLES ---
+                    const nombre = p.paciente || p.nombre || "Sin Nombre";
+                    const dni = p.dni || p.documento || "S/D";
+                    const hora = p.hora || p.horario || "--:--";
+                    const estudio = p.estudio || p.tipo || "ESTUDIO";
+                    
+                    // Busca el tipo de traslado (Silla o Camilla)
+                    const traslado = p.traslado || p.metodo || p.transporte || "TRASLADO";
+                    
+                    // Lógica para el Oxígeno: detecta "SI", "si", o true
+                    const tieneOxigeno = (String(p.oxigeno).toUpperCase() === "SI" || p.oxigeno === true);
+
+                    // Prioridad
+                    const esUrgente = (p.prioridad === "rojo" || p.urgencia === "SI");
+
                     const card = document.createElement('div');
                     card.className = `card ${esUrgente ? 'urgente-flash' : ''}`;
                     
                     card.innerHTML = `
                         ${esUrgente ? '<span class="badge-urgente">⚠️ ¡TRASLADO URGENTE! ⚠️</span>' : ''}
-                        <div style="display:flex; justify-content:space-between;">
-                            <strong>${p.paciente}</strong>
-                            <span>${p.hora} hs</span>
+                        <div style="display:flex; justify-content:space-between; align-items: center;">
+                            <span class="paciente-nombre">${nombre}</span>
+                            <span class="hora-texto">${hora} hs</span>
                         </div>
-                        <p style="margin: 8px 0;">DNI: ${p.dni}</p>
-                        <div>
-                            <span class="tag tag-estudio">${p.tipo ? p.tipo.toUpperCase() : 'ESTUDIO'}</span>
-                            <span class="tag">${p.traslado || 'S/D'}</span>
-                            ${p.oxigeno === "SI" ? '<span class="tag" style="background:#d1ecf1">O2</span>' : ''}
+                        <p class="dni-texto"><strong>DNI:</strong> ${dni}</p>
+                        
+                        <div class="tags-container">
+                            <span class="tag tag-estudio">📋 ${estudio}</span>
+                            <span class="tag tag-traslado">🚑 ${traslado}</span>
+                            <span class="tag ${tieneOxigeno ? 'tag-oxigeno' : 'tag-no-oxigeno'}">
+                                ${tieneOxigeno ? '💧 OXÍGENO: SÍ' : 'SIN OXÍGENO'}
+                            </span>
                         </div>
-                        <button class="btn-ok" onclick="finalizarPedido('${id}')">✓ FINALIZAR</button>
+
+                        <button class="btn-ok" onclick="finalizarPedido('${id}')">✓ FINALIZAR TRASLADO</button>
                     `;
                     listaDiv.appendChild(card);
                 });
@@ -128,30 +131,19 @@
             }
         });
 
-        // Función para mover al HISTORIAL y borrar de PENDIENTES
         window.finalizarPedido = function(id) {
-            if(confirm("¿Confirmas que el traslado ha finalizado?")) {
-                const datosDelPedido = pedidosActivos[id];
+            if(confirm("¿Confirmar finalización del traslado?")) {
                 const historialRef = ref(db, 'historial');
-
-                // Preparamos el registro para el historial
                 const registroFinal = {
-                    ...datosDelPedido,
+                    ...pedidosActivos[id],
                     horaFinalizado: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
                     fechaFinalizado: new Date().toLocaleDateString(),
                     timestampServer: serverTimestamp()
                 };
 
-                // 1. Guardar en carpeta historial
-                push(historialRef, registroFinal)
-                    .then(() => {
-                        // 2. Si se guardó bien, borrar de pedidos pendientes
-                        const itemRef = ref(db, 'pedidos/' + id);
-                        remove(itemRef);
-                    })
-                    .catch((error) => {
-                        alert("Error al archivar: " + error.message);
-                    });
+                push(historialRef, registroFinal).then(() => {
+                    remove(ref(db, 'pedidos/' + id));
+                });
             }
         };
     </script>

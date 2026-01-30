@@ -4,77 +4,53 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pedido de Traslado - Guardia</title>
-    <link rel="stylesheet" href="style.css">
     <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         .hidden { display: none !important; }
-        .sub-section { 
-            background: #f1f4f9; padding: 15px; border-radius: 8px; 
-            margin: 10px 0; border-left: 5px solid #007bff;
-        }
+        .sub-section { background: #f1f4f9; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 5px solid #007bff; }
         .radio-group { margin: 10px 0; display: flex; gap: 15px; align-items: center; }
         .section { margin-bottom: 15px; }
-        label { font-weight: bold; display: block; margin-bottom: 5px; }
-        .error-field { border: 2px solid #ff0000 !important; background-color: #fff2f2 !important; }
-
-        /* Estilos para la lista de pendientes al pie */
-        .monitor-pedidos {
-            margin-top: 30px;
-            border-top: 2px solid #eee;
-            padding-top: 20px;
+        label { font-weight: bold; display: block; margin-bottom: 5px; color: #333; }
+        input, select { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        
+        .btn-enviar { 
+            background-color: #007bff; color: white; border: none; padding: 15px; 
+            width: 100%; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 1rem;
         }
-        .pedido-min {
-            background: #fff;
-            border: 1px solid #ddd;
-            padding: 10px;
-            border-radius: 6px;
-            margin-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-left: 5px solid #ffc107; /* Amarillo de pendiente */
+        .btn-enviar:hover { background-color: #0056b3; }
+
+        /* Monitor de pedidos al pie */
+        .monitor-pedidos { margin-top: 30px; border-top: 2px solid #eee; padding-top: 20px; }
+        .pedido-min { 
+            background: #fff; border: 1px solid #ddd; padding: 12px; border-radius: 8px; 
+            margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; 
+            border-left: 5px solid #ffc107; 
         }
         .prioridad-rojo { border-left-color: #dc3545 !important; }
         .paciente-info { font-weight: bold; color: #333; }
-        .solicitud-tipo { 
-            font-size: 0.85em; 
-            background: #e9ecef; 
-            padding: 2px 8px; 
-            border-radius: 4px; 
-            color: #495057;
-        }
-
-        /* BOTÓN CANCELAR ROJO */
-        .btn-cancelar-pedido {
-            background-color: #dc3545;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.75em;
-            font-weight: bold;
-            margin-left: 10px;
-        }
-        .btn-cancelar-pedido:hover {
-            background-color: #a71d2a;
-        }
+        .solicitud-tipo { font-size: 0.85em; background: #e9ecef; padding: 2px 8px; border-radius: 4px; color: #495057; }
+        .btn-cancelar-pedido { background-color: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.75em; }
     </style>
 </head>
 <body>
+
     <div class="container">
-        <h2 style="text-align: center; color: #007bff;">📋 Nuevo Pedido </h2>
+        <h2 style="text-align: center; color: #007bff;">📋 Nuevo Pedido</h2>
+        
         <form id="pedidoForm">
             <div class="section">
+                <label>Datos del Paciente:</label>
                 <input type="text" id="nombreInput" placeholder="Nombre y Apellido" required>
-                <input type="number" id="dniInput" placeholder="DNI" required>
+                <input type="number" id="dniInput" placeholder="DNI del paciente" required>
             </div>
 
-            <div class="section logistics">
+            <div class="section">
                 <label>Servicio de Origen:</label>
                 <select id="servicioOrigen" class="select-servicios"></select>
             </div>
 
-            <div class="section logistics">
+            <div class="section">
                 <label>¿Qué desea solicitar?:</label>
                 <select id="accionSolicitar">
                     <option value="" disabled selected>Seleccione una opción...</option>
@@ -86,17 +62,19 @@
             <div id="contenedorEstudios" class="hidden sub-section">
                 <label>Tipo de Estudio:</label>
                 <div class="radio-group">
-                    <label style="font-weight: normal;"><input type="radio" name="tipo" value="rx" id="optRx"> RX</label>
-                    <label style="font-weight: normal;"><input type="radio" name="tipo" value="tac" id="optTac"> TAC</label>
+                    <label><input type="radio" name="tipo" value="rx" id="optRx"> RX</label>
+                    <label><input type="radio" name="tipo" value="tac" id="optTac"> TAC</label>
                 </div>
+                
                 <div id="divTac" class="hidden">
                     <select id="regTac">
                         <option value="Encéfalo">Encéfalo</option>
                         <option value="Tórax">Tórax</option>
                         <option value="Abdomen">Abdomen</option>
                     </select>
-                    <label style="font-weight: normal;"><input type="checkbox" id="conContraste"> Con Contraste</label>
+                    <label style="font-weight: normal; display: inline;"><input type="checkbox" id="conContraste"> Con Contraste</label>
                 </div>
+
                 <div id="divRx" class="hidden">
                     <select id="regRx">
                         <option value="Tórax">Tórax</option>
@@ -111,27 +89,25 @@
                 <select id="servicioDestino" class="select-servicios"></select>
             </div>
 
-            <div class="section logistics">
-                <label>Traslado en:</label>
+            <div class="section">
+                <label>Logística de Traslado:</label>
                 <select id="modoTraslado">
                     <option value="Silla de Ruedas">Silla de Ruedas</option>
                     <option value="Camilla">Camilla</option>
                 </select>
                 
-                <div class="section" style="margin-top:10px;">
-                    <label>¿Requiere Oxigeno?</label>
-                    <div class="radio-group">
-                        <label style="font-weight: normal;"><input type="radio" name="oxigeno" value="SI"> SI</label>
-                        <label style="font-weight: normal;"><input type="radio" name="oxigeno" value="NO" checked> NO</label>
-                    </div>
+                <label style="margin-top: 10px;">¿Requiere Oxígeno?</label>
+                <div class="radio-group">
+                    <label><input type="radio" name="oxigeno" value="SI"> SÍ</label>
+                    <label><input type="radio" name="oxigeno" value="NO" checked> NO</label>
                 </div>
             </div>
             
             <div class="section">
                 <label>Prioridad:</label>
                 <select id="prioridadSelect">
-                    <option value="verde" style="color: green;">🟢 Rutina</option>
-                    <option value="rojo" style="color: red;">🔴 URGENTE</option>
+                    <option value="verde">🟢 Rutina</option>
+                    <option value="rojo">🔴 URGENTE</option>
                 </select>
             </div>
 
@@ -139,7 +115,7 @@
         </form>
 
         <div class="monitor-pedidos">
-            <h3 style="color: #333;">⏳ Pedidos Pendientes/En Curso</h3>
+            <h3>⏳ Pedidos Pendientes</h3>
             <div id="listaPendientes">
                 <p style="color: gray; font-style: italic;">No hay pedidos pendientes.</p>
             </div>
@@ -163,10 +139,11 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // --- 1. Llenar Selects y Lógica de Interfaz ---
+        // Llenar Servicios
         const servicios = ["Guardia de Adultos", "Guardia Pediatrica", "Guardia Obstetricia", "Cuidados Minimos", "Pediatria Internacion", "Cuidados Progresivos", "Cuidados Intensivos", "Quirofano", "Neonatologia"];
         document.querySelectorAll('.select-servicios').forEach(s => servicios.forEach(serv => s.add(new Option(serv, serv))));
 
+        // Lógica de Interfaz
         const accionSolicitar = document.getElementById('accionSolicitar');
         accionSolicitar.addEventListener('change', () => {
             document.getElementById('contenedorEstudios').classList.toggle('hidden', accionSolicitar.value !== "Estudios");
@@ -176,68 +153,69 @@
         document.getElementById('optRx').addEventListener('change', () => { document.getElementById('divRx').classList.remove('hidden'); document.getElementById('divTac').classList.add('hidden'); });
         document.getElementById('optTac').addEventListener('change', () => { document.getElementById('divTac').classList.remove('hidden'); document.getElementById('divRx').classList.add('hidden'); });
 
-        // --- 2. MONITOR EN TIEMPO REAL ---
-        const listaPendientes = document.getElementById('listaPendientes');
+        // Monitor en Tiempo Real
         onValue(ref(db, 'pedidos'), (snapshot) => {
-            listaPendientes.innerHTML = "";
+            const lista = document.getElementById('listaPendientes');
+            lista.innerHTML = "";
             const data = snapshot.val();
-            let hayPendientes = false;
-
             if (data) {
                 Object.keys(data).forEach(key => {
                     const p = data[key];
-                    if (p.estado !== "Finalizado") {
-                        hayPendientes = true;
-                        const item = document.createElement('div');
-                        item.className = `pedido-min ${p.prioridad === 'rojo' ? 'prioridad-rojo' : ''}`;
-                        item.innerHTML = `
-                            <div>
-                                <span class="paciente-info">${p.paciente}</span><br>
-                                <span class="solicitud-tipo">${p.solicitud}</span>
-                            </div>
-                            <button class="btn-cancelar-pedido" data-id="${key}">CANCELAR</button>
-                        `;
-                        listaPendientes.appendChild(item);
-                    }
+                    const item = document.createElement('div');
+                    item.className = `pedido-min ${p.prioridad === 'rojo' ? 'prioridad-rojo' : ''}`;
+                    item.innerHTML = `
+                        <div>
+                            <span class="paciente-info">${p.paciente}</span><br>
+                            <span class="solicitud-tipo">${p.estudio || p.solicitud}</span>
+                        </div>
+                        <button class="btn-cancelar-pedido" onclick="window.eliminarPedido('${key}')">CANCELAR</button>
+                    `;
+                    lista.appendChild(item);
                 });
-
-                // Lógica para el botón de cancelar
-                document.querySelectorAll('.btn-cancelar-pedido').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        const idPedido = e.target.getAttribute('data-id');
-                        if (confirm("¿Está seguro de que desea eliminar este pedido?")) {
-                            remove(ref(db, `pedidos/${idPedido}`));
-                        }
-                    });
-                });
+            } else {
+                lista.innerHTML = '<p style="color: gray; font-style: italic;">No hay pedidos pendientes.</p>';
             }
-            if (!hayPendientes) listaPendientes.innerHTML = '<p style="color: gray; font-style: italic;">No hay pedidos pendientes.</p>';
         });
 
-        // --- 3. ENVÍO DE DATOS ---
+        window.eliminarPedido = (id) => { if(confirm("¿Desea cancelar el pedido?")) remove(ref(db, `pedidos/${id}`)); };
+
+        // ENVÍO DE DATOS
         document.getElementById('btnEnviar').addEventListener('click', () => {
             const nombre = document.getElementById('nombreInput').value.trim();
+            const dni = document.getElementById('dniInput').value.trim();
             const accion = accionSolicitar.value;
-            const origen = document.getElementById('servicioOrigen').value;
-            const destino = accion === "Traslado" ? document.getElementById('servicioDestino').value : "Imágenes";
+            const oxigeno = document.querySelector('input[name="oxigeno"]:checked').value;
+            const modo = document.getElementById('modoTraslado').value;
 
-            if (!nombre || !accion || (accion === "Traslado" && origen === destino)) {
-                alert("Verifique los datos (Nombre, Acción y que Origen/Destino sean distintos)");
+            if (!nombre || !dni || !accion) {
+                alert("Complete Nombre, DNI y qué desea solicitar.");
                 return;
             }
 
-            const pedido = {
+            let detalleEstudio = "";
+            if (accion === "Estudios") {
+                const tipo = document.querySelector('input[name="tipo"]:checked')?.value;
+                if(!tipo) { alert("Seleccione si es RX o TAC"); return; }
+                const region = tipo === "rx" ? document.getElementById('regRx').value : document.getElementById('regTac').value;
+                const contraste = (tipo === "tac" && document.getElementById('conContraste').checked) ? " C/C" : "";
+                detalleEstudio = `${tipo.toUpperCase()} ${region}${contraste}`;
+            } else {
+                detalleEstudio = `Traslado a ${document.getElementById('servicioDestino').value}`;
+            }
+
+            const nuevoPedido = {
                 paciente: nombre,
-                solicitud: accion,
-                origen: origen,
-                destino: destino,
+                dni: dni,
+                hora: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                estudio: detalleEstudio,
+                traslado: modo,
+                oxigeno: oxigeno,
                 prioridad: document.getElementById('prioridadSelect').value,
-                estado: "Pendiente",
                 timestamp: Date.now()
             };
 
-            push(ref(db, 'pedidos'), pedido).then(() => {
-                alert("🚀 Pedido enviado");
+            push(ref(db, 'pedidos'), nuevoPedido).then(() => {
+                alert("🚀 Pedido enviado al camillero");
                 document.getElementById('pedidoForm').reset();
                 document.getElementById('contenedorEstudios').classList.add('hidden');
                 document.getElementById('contenedorTraslado').classList.add('hidden');
