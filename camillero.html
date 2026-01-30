@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#2c3e50">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/822/822143.png">
+    <meta name="theme-color" content="#2c3e50">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/822/822143.png">
 
     <title>Panel Camillero - Gestión de Turnos</title>
     <style>
@@ -21,7 +21,7 @@
         body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
         .container { max-width: 500px; margin: auto; }
         
-           .header-status { 
+        .header-status { 
             background: var(--primary); color: white; padding: 15px; 
             border-radius: 12px; text-align: center; margin-bottom: 15px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
@@ -51,9 +51,38 @@
             background: #28a745; color: white; border: none; padding: 14px; width: 100%;
             border-radius: 8px; margin-top: 15px; font-weight: bold; cursor: pointer;
         }
+
+        /* --- ESTILOS ALERTA FLOTANTE --- */
+        .alerta-flotante {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-150%);
+            width: 90%; max-width: 400px; background: #f1c40f; color: #2c3e50;
+            padding: 20px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            z-index: 9999; transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex; flex-direction: column; align-items: center; text-align: center;
+        }
+        .alerta-flotante.show { transform: translateX(-50%) translateY(0); }
+        .alerta-urgente { background: #e74c3c !important; color: white !important; animation: sacudida 0.5s infinite; }
+        @keyframes sacudida {
+            0% { transform: translateX(-50%) rotate(0deg); }
+            25% { transform: translateX(-52%) rotate(-1deg); }
+            75% { transform: translateX(-48%) rotate(1deg); }
+            100% { transform: translateX(-50%) rotate(0deg); }
+        }
+        .btn-cerrar-alerta {
+            margin-top: 15px; background: #2c3e50; color: white; border: none;
+            padding: 10px 25px; border-radius: 20px; font-weight: bold; cursor: pointer;
+        }
     </style>
 </head>
 <body>
+
+    <div id="popupAlerta" class="alerta-flotante">
+        <h3>🚨 NUEVO PEDIDO</h3>
+        <p id="popPaciente">Paciente: -</p>
+        <p id="popEstudio">Estudio: -</p>
+        <button class="btn-cerrar-alerta" onclick="cerrarAlerta()">ENTENDIDO</button>
+    </div>
+
     <div class="container">
         <div class="header-status">
             <div id="reloj" style="font-size: 1.2rem; font-weight: bold;">00:00:00</div>
@@ -85,12 +114,15 @@
         const db = getDatabase(app);
         const pedidosRef = ref(db, 'pedidos');
 
-        // Lista de Feriados Argentina 2025 (puedes actualizarla año a año)
         const feriadosArg = ["2025-01-01", "2025-03-03", "2025-03-04", "2025-03-24", "2025-04-02", "2025-04-18", "2025-05-01", "2025-05-25", "2025-06-16", "2025-06-20", "2025-07-09", "2025-08-15", "2025-10-12", "2025-11-20", "2025-12-08", "2025-12-25"];
+
+        // Control de notificaciones
+        let pedidosAnterioresIds = new Set();
+        let primeraCarga = true;
 
         function esFranquero() {
             const hoy = new Date();
-            const diaSemana = hoy.getDay(); // 0 es Domingo, 6 es Sábado
+            const diaSemana = hoy.getDay(); 
             const fechaString = hoy.toISOString().split('T')[0];
             return (diaSemana === 0 || diaSemana === 6 || feriadosArg.includes(fechaString));
         }
@@ -98,7 +130,6 @@
         function obtenerTurnoActual() {
             const h = new Date().getHours();
             const esFinde = esFranquero();
-
             if (esFinde && h >= 7 && h < 21) return "FRANQUERO";
             if (h >= 7 && h < 14) return "MAÑANA";
             if (h >= 14 && h < 21) return "TARDE";
@@ -112,32 +143,36 @@
             document.getElementById('infoTurno').innerText = "TURNO: " + obtenerTurnoActual();
         }, 1000);
 
-        let pedidosActuales = {};
+        // Solicitar permisos al inicio
+        if ("Notification" in window) {
+            Notification.requestPermission();
+        }
 
         onValue(pedidosRef, (snapshot) => {
-            pedidosActuales = snapshot.val();
+            const pedidosActuales = snapshot.val();
             const listaDiv = document.getElementById('listaPedidos');
             listaDiv.innerHTML = "";
-            
             const turno = obtenerTurnoActual();
+            const nuevosIds = new Set();
 
             if (pedidosActuales) {
                 let hayPedidos = false;
                 Object.keys(pedidosActuales).forEach(id => {
                     const p = pedidosActuales[id];
+                    nuevosIds.add(id);
+
+                    // Lógica de Notificación para pedidos nuevos
+                    if (!primeraCarga && !pedidosAnterioresIds.has(id)) {
+                        enviarNotificacion(p.paciente, p.estudio, p.prioridad);
+                    }
+
                     const hPedido = parseInt(p.hora.split(":")[0]);
                     let mostrar = false;
 
-                    // Lógica de filtrado por turno
-                    if (turno === "FRANQUERO") {
-                        if (hPedido >= 7 && hPedido < 21) mostrar = true;
-                    } else if (turno === "MAÑANA") {
-                        if (hPedido >= 7 && hPedido < 14) mostrar = true;
-                    } else if (turno === "TARDE") {
-                        if (hPedido >= 14 && hPedido < 21) mostrar = true;
-                    } else { // NOCHE
-                        if (hPedido >= 21 || hPedido < 7) mostrar = true;
-                    }
+                    if (turno === "FRANQUERO") { if (hPedido >= 7 && hPedido < 21) mostrar = true; }
+                    else if (turno === "MAÑANA") { if (hPedido >= 7 && hPedido < 14) mostrar = true; }
+                    else if (turno === "TARDE") { if (hPedido >= 14 && hPedido < 21) mostrar = true; }
+                    else { if (hPedido >= 21 || hPedido < 7) mostrar = true; }
 
                     if (mostrar) {
                         hayPedidos = true;
@@ -164,66 +199,62 @@
             } else {
                 listaDiv.innerHTML = "<p style='text-align:center;'>✅ No hay traslados pendientes.</p>";
             }
+            pedidosAnterioresIds = nuevosIds;
+            primeraCarga = false;
         });
-        
-        // Registro del Service Worker
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('Service Worker registrado con éxito', reg))
-            .catch(err => console.log('Error al registrar Service Worker', err));
-    });
-}
 
-       // --- FUNCIÓN DE NOTIFICACIÓN CONSOLIDADA ---
-function enviarNotificacion(paciente, estudio, prioridad) {
-    const esRojo = prioridad === "rojo";
+        function enviarNotificacion(paciente, estudio, prioridad) {
+            const esRojo = prioridad === "rojo";
+            const pop = document.getElementById('popupAlerta');
+            document.getElementById('popPaciente').innerHTML = `<strong>Paciente:</strong> ${paciente}`;
+            document.getElementById('popEstudio').innerHTML = `<strong>Estudio:</strong> ${estudio}`;
+            
+            if (esRojo) {
+                pop.classList.add('alerta-urgente');
+                pop.querySelector('h3').innerText = "🚨 ¡URGENCIA MÉDICA!";
+            } else {
+                pop.classList.remove('alerta-urgente');
+                pop.querySelector('h3').innerText = "📋 NUEVO PEDIDO";
+            }
+            pop.classList.add('show');
 
-    // 1. POP-UP VISUAL (El cartel que baja en la pantalla)
-    const pop = document.getElementById('popupAlerta');
-    document.getElementById('popPaciente').innerHTML = `<strong>Paciente:</strong> ${paciente}`;
-    document.getElementById('popEstudio').innerHTML = `<strong>Estudio:</strong> ${estudio}`;
-    
-    if (esRojo) {
-        pop.classList.add('alerta-urgente');
-        pop.querySelector('h3').innerText = "🚨 ¡URGENCIA MÉDICA!";
-    } else {
-        pop.classList.remove('alerta-urgente');
-        pop.querySelector('h3').innerText = "📋 NUEVO PEDIDO";
-    }
-    pop.classList.add('show');
+            if (Notification.permission === "granted") {
+                navigator.serviceWorker.ready.then(reg => {
+                    reg.showNotification(esRojo ? "🚨 URGENCIA" : "🚑 NUEVO TRASLADO", {
+                        body: `Paciente: ${paciente}\nEstudio: ${estudio}`,
+                        icon: "https://cdn-icons-png.flaticon.com/512/822/822143.png",
+                        vibrate: [300, 100, 300],
+                        tag: "pedido-" + Date.now(),
+                        renotify: true
+                    });
+                });
+            }
 
-    // 2. NOTIFICACIÓN DE SISTEMA (Vía Service Worker)
-    // Esto es lo que permite que se vea fuera del navegador
-    if (Notification.permission === "granted") {
-        navigator.serviceWorker.ready.then(registration => {
-            registration.showNotification(esRojo ? "🚨 URGENCIA" : "🚑 NUEVO TRASLADO", {
-                body: `Paciente: ${paciente}\nEstudio: ${estudio}`,
-                icon: "https://cdn-icons-png.flaticon.com/512/822/822143.png",
-                vibrate: [300, 100, 300],
-                tag: "pedido-" + Date.now(),
-                renotify: true
-            });
-        });
-    }
+            const sonido = new Audio(esRojo ? 
+                'https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3' : 
+                'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'
+            );
+            sonido.play().catch(() => {});
+        }
 
-    // 3. SONIDO
-    const sonido = new Audio(esRojo ? 
-        'https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3' : 
-        'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'
-    );
-    sonido.play().catch(e => console.warn("Sonido bloqueado hasta interacción"));
-}
-
-
+        window.cerrarAlerta = () => document.getElementById('popupAlerta').classList.remove('show');
 
         window.finalizarPedido = function(id) {
             if(confirm("¿Confirmas finalización?")) {
                 const historialRef = ref(db, 'historial');
-                const registroFinal = { ...pedidosActuales[id], fechaFinalizado: new Date().toLocaleDateString(), timestampServer: serverTimestamp() };
-                push(historialRef, registroFinal).then(() => remove(ref(db, 'pedidos/' + id)));
+                onValue(ref(db, 'pedidos/' + id), (snap) => {
+                    const data = snap.val();
+                    if(data) {
+                        const registro = { ...data, fechaFinalizado: new Date().toLocaleDateString(), timestampServer: serverTimestamp() };
+                        push(historialRef, registro).then(() => remove(ref(db, 'pedidos/' + id)));
+                    }
+                }, { onlyOnce: true });
             }
         };
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js');
+        }
     </script>
 </body>
 </html>
