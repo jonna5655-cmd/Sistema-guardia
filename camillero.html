@@ -3,169 +3,133 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel Camillero - Gestión de Turnos</title>
+    <title>Panel Camillero - Disponibilidad</title>
     <style>
-        :root {
-            --primary: #2c3e50;
-            --accent: #3498db;
-            --urgente: #e74c3c;
-            --franquero: #8e44ad;
-        }
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
-        .container { max-width: 500px; margin: auto; }
+        :root { --primary: #2c3e50; --success: #28a745; --danger: #dc3545; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; margin: 0; padding: 15px; }
+        .container { max-width: 450px; margin: auto; }
         
-        .header-status { 
-            background: var(--primary); color: white; padding: 15px; 
-            border-radius: 12px; text-align: center; margin-bottom: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        .status-header { 
+            background: white; padding: 20px; border-radius: 15px; text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 20px;
         }
 
-        .badge-dia {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 0.8rem;
-            margin-top: 5px;
-            background: rgba(255,255,255,0.2);
+        /* Botón de Disponibilidad */
+        .btn-status {
+            width: 100%; padding: 15px; border: none; border-radius: 10px;
+            font-size: 1.2rem; font-weight: bold; cursor: pointer; color: white;
+            transition: 0.3s; margin-top: 10px;
         }
+        .disponible { background: var(--success); box-shadow: 0 4px 0 #1e7e34; }
+        .inactivo { background: var(--danger); box-shadow: 0 4px 0 #bd2130; }
 
         .card {
-            background: #fff; border-left: 8px solid var(--accent); 
-            margin: 15px 0; padding: 20px; border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            background: white; border-radius: 12px; padding: 15px; margin-bottom: 15px;
+            border-left: 8px solid #3498db; box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            box-sizing: border-box; /* Fix margen */
         }
-        .urgente-flash { border: 3px solid var(--urgente) !important; animation: parpadeo 1.5s infinite; }
-        @keyframes parpadeo { 0% { background-color: #fff; } 50% { background-color: #ffeaea; } 100% { background-color: #fff; } }
+        .urgente { border-color: var(--danger); animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { background: #fff; } 50% { background: #fff5f5; } 100% { background: #fff; } }
 
-        .tag { padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; margin-right: 5px; border: 1px solid #ddd; }
-        .tag-oxigeno { background: #d1ecf1; color: #0c5460; }
-        
-        .btn-ok {
-            background: #28a745; color: white; border: none; padding: 14px; width: 100%;
-            border-radius: 8px; margin-top: 15px; font-weight: bold; cursor: pointer;
-        }
+        .tags-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .tag { padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; background: #eee; white-space: nowrap; }
+        .tag-o2 { background: #d1ecf1; color: #0c5460; }
+        .tag-estudio { background: #fff3cd; color: #856404; }
+
+        .btn-finalizar { background: var(--success); color: white; border: none; width: 100%; padding: 12px; border-radius: 8px; margin-top: 15px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header-status">
-            <div id="reloj" style="font-size: 1.2rem; font-weight: bold;">00:00:00</div>
-            <div id="fechaActual" style="font-size: 0.9rem; opacity: 0.8;">--/--/--</div>
-            <div id="infoTurno" class="badge-dia">Detectando Turno...</div>
+        <div class="status-header">
+            <div id="reloj" style="font-size: 1.4rem; font-weight: bold;">00:00:00</div>
+            <button id="btnToggleStatus" class="btn-status inactivo">INACTIVO</button>
+            <p id="labelStatus" style="margin-top: 8px; font-size: 0.9rem; font-weight: bold; color: #666;">Turno fuera de línea</p>
         </div>
 
-        <h2 style="color: var(--primary); text-align: center;">⏰ Pedidos Activos</h2>
-        <div id="listaPedidos">
-            <p style="text-align:center; color: #666;">Cargando pedidos...</p>
-        </div>
+        <div id="listaPedidos"></div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, onValue, remove, push, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getDatabase, ref, onValue, set, remove, push, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAAaOmAIQ6GorJsSQAiFg-mUpnZJR2ivd4",
             authDomain: "appguardia-8d02b.firebaseapp.com",
             databaseURL: "https://appguardia-8d02b-default-rtdb.firebaseio.com",
-            projectId: "appguardia-8d02b",
-            storageBucket: "appguardia-8d02b.firebasestorage.app",
-            messagingSenderId: "830140146359",
-            appId: "1:830140146359:web:dfbac10ec53d7ee76e2332"
+            projectId: "appguardia-8d02b"
         };
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
+        const statusRef = ref(db, 'config/estadoTurno');
         const pedidosRef = ref(db, 'pedidos');
 
-        // Lista de Feriados Argentina 2025 (puedes actualizarla año a año)
-        const feriadosArg = ["2025-01-01", "2025-03-03", "2025-03-04", "2025-03-24", "2025-04-02", "2025-04-18", "2025-05-01", "2025-05-25", "2025-06-16", "2025-06-20", "2025-07-09", "2025-08-15", "2025-10-12", "2025-11-20", "2025-12-08", "2025-12-25"];
-
-        function esFranquero() {
-            const hoy = new Date();
-            const diaSemana = hoy.getDay(); // 0 es Domingo, 6 es Sábado
-            const fechaString = hoy.toISOString().split('T')[0];
-            return (diaSemana === 0 || diaSemana === 6 || feriadosArg.includes(fechaString));
-        }
-
-        function obtenerTurnoActual() {
-            const h = new Date().getHours();
-            const esFinde = esFranquero();
-
-            if (esFinde && h >= 7 && h < 21) return "FRANQUERO";
-            if (h >= 7 && h < 14) return "MAÑANA";
-            if (h >= 14 && h < 21) return "TARDE";
-            return "NOCHE";
-        }
-
-        setInterval(() => {
-            const ahora = new Date();
-            document.getElementById('reloj').innerText = ahora.toLocaleTimeString();
-            document.getElementById('fechaActual').innerText = ahora.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            document.getElementById('infoTurno').innerText = "TURNO: " + obtenerTurnoActual();
-        }, 1000);
-
+        let isAvailable = false;
         let pedidosActuales = {};
 
-        onValue(pedidosRef, (snapshot) => {
-            pedidosActuales = snapshot.val();
-            const listaDiv = document.getElementById('listaPedidos');
-            listaDiv.innerHTML = "";
-            
-            const turno = obtenerTurnoActual();
-
-            if (pedidosActuales) {
-                let hayPedidos = false;
-                Object.keys(pedidosActuales).forEach(id => {
-                    const p = pedidosActuales[id];
-                    const hPedido = parseInt(p.hora.split(":")[0]);
-                    let mostrar = false;
-
-                    // Lógica de filtrado por turno
-                    if (turno === "FRANQUERO") {
-                        if (hPedido >= 7 && hPedido < 21) mostrar = true;
-                    } else if (turno === "MAÑANA") {
-                        if (hPedido >= 7 && hPedido < 14) mostrar = true;
-                    } else if (turno === "TARDE") {
-                        if (hPedido >= 14 && hPedido < 21) mostrar = true;
-                    } else { // NOCHE
-                        if (hPedido >= 21 || hPedido < 7) mostrar = true;
-                    }
-
-                    if (mostrar) {
-                        hayPedidos = true;
-                        const esUrgente = p.prioridad === "rojo";
-                        const card = document.createElement('div');
-                        card.className = `card ${esUrgente ? 'urgente-flash' : ''}`;
-                        card.innerHTML = `
-                            <div style="display:flex; justify-content:space-between;">
-                                <strong>${p.paciente}</strong>
-                                <span>${p.hora} hs</span>
-                            </div>
-                            <p>DNI: ${p.dni}</p>
-                            <div style="margin-top:10px;">
-                                <span class="tag" style="background:#fff3cd;">${p.estudio || 'Estudio'}</span>
-                                <span class="tag">${p.traslado || 'S/D'}</span>
-                                ${p.oxigeno === "SI" ? '<span class="tag tag-oxigeno">💧 O2</span>' : ''}
-                            </div>
-                            <button class="btn-ok" onclick="finalizarPedido('${id}')">✓ FINALIZAR</button>
-                        `;
-                        listaDiv.appendChild(card);
-                    }
-                });
-                if (!hayPedidos) listaDiv.innerHTML = "<p style='text-align:center;'>✅ Sin traslados en este turno.</p>";
-            } else {
-                listaDiv.innerHTML = "<p style='text-align:center;'>✅ No hay traslados pendientes.</p>";
-            }
+        // Manejo del botón de Disponibilidad
+        const btn = document.getElementById('btnToggleStatus');
+        btn.addEventListener('click', () => {
+            isAvailable = !isAvailable;
+            set(statusRef, isAvailable);
         });
 
-        window.finalizarPedido = function(id) {
-            if(confirm("¿Confirmas finalización?")) {
-                const historialRef = ref(db, 'historial');
-                const registroFinal = { ...pedidosActuales[id], fechaFinalizado: new Date().toLocaleDateString(), timestampServer: serverTimestamp() };
-                push(historialRef, registroFinal).then(() => remove(ref(db, 'pedidos/' + id)));
+        // Escuchar estado global
+        onValue(statusRef, (snapshot) => {
+            isAvailable = snapshot.val() || false;
+            btn.innerText = isAvailable ? "DISPONIBLE" : "INACTIVO";
+            btn.className = `btn-status ${isAvailable ? 'disponible' : 'inactivo'}`;
+            document.getElementById('labelStatus').innerText = isAvailable ? "Recibiendo pedidos de este turno" : "Turno cerrado / Fuera de servicio";
+            renderizar();
+        });
+
+        // Escuchar pedidos
+        onValue(pedidosRef, (snapshot) => {
+            pedidosActuales = snapshot.val();
+            renderizar();
+        });
+
+        function renderizar() {
+            const listaDiv = document.getElementById('listaPedidos');
+            listaDiv.innerHTML = "";
+            if (!isAvailable) {
+                listaDiv.innerHTML = "<p style='text-align:center; color:gray;'>Debes estar DISPONIBLE para ver pedidos.</p>";
+                return;
+            }
+            if (pedidosActuales) {
+                Object.keys(pedidosActuales).forEach(id => {
+                    const p = pedidosActuales[id];
+                    const card = document.createElement('div');
+                    card.className = `card ${p.prioridad === 'rojo' ? 'urgente' : ''}`;
+                    card.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; font-weight:bold;">
+                            <span>${p.paciente}</span><span>${p.hora} hs</span>
+                        </div>
+                        <div style="font-size:0.9rem; margin: 5px 0;">DNI: ${p.dni}</div>
+                        <div class="tags-container">
+                            <span class="tag tag-estudio">${p.estudio}</span>
+                            <span class="tag">${p.traslado}</span>
+                            ${p.oxigeno === 'SI' ? '<span class="tag tag-o2">💧 O2: SÍ</span>' : ''}
+                        </div>
+                        <button class="btn-finalizar" onclick="finalizar('${id}')">✓ FINALIZAR</button>
+                    `;
+                    listaDiv.appendChild(card);
+                });
+            }
+        }
+
+        window.finalizar = (id) => {
+            if(confirm("¿Traslado finalizado?")) {
+                const histRef = ref(db, 'historial');
+                push(histRef, {...pedidosActuales[id], timestampServer: serverTimestamp()}).then(() => {
+                    remove(ref(db, 'pedidos/' + id));
+                });
             }
         };
+
+        setInterval(() => { document.getElementById('reloj').innerText = new Date().toLocaleTimeString(); }, 1000);
     </script>
 </body>
 </html>
