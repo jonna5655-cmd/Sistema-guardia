@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso Médicos - Hospital</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        h2 { text-align: center; color: #007bff; }
+        input, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-secondary { background: #e9ecef; color: #333; font-size: 0.9em; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <h2 id="authTitle">Iniciar Sesión</h2>
+    
+    <form id="authForm">
+        <input type="email" id="email" placeholder="Correo electrónico" required>
+        <input type="password" id="pass" placeholder="Contraseña" required>
+
+        <div id="registroExtra" class="hidden">
+            <input type="text" id="nombreMed" placeholder="Nombre y Apellido">
+            <input type="number" id="dniMed" placeholder="DNI">
+            <input type="text" id="matriculaMed" placeholder="Matrícula">
+            <select id="hospitalMed">
+                <option value="" disabled selected>Seleccione Hospital</option>
+                <option value="Hospital Central">Hospital Central</option>
+                <option value="Hospital Regional">Hospital Regional</option>
+            </select>
+            <select id="servicioMed">
+                <option value="" disabled selected>Servicio Fijo</option>
+                <option value="Guardia de Adultos">Guardia de Adultos</option>
+                <option value="Pediatría">Pediatría</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="btnPrincipal">Ingresar</button>
+    </form>
+    
+    <button class="btn btn-secondary" id="btnToggle">¿No tienes cuenta? Regístrate</button>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    // Tu configuración (usa la misma de index.html)
+    const firebaseConfig = { 
+        apiKey: "AIzaSyAAaOmAIQ6GorJsSQAiFg-mUpnZJR2ivd4",
+        authDomain: "appguardia-8d02b.firebaseapp.com",
+        databaseURL: "https://appguardia-8d02b-default-rtdb.firebaseio.com",
+        projectId: "appguardia-8d02b",
+        storageBucket: "appguardia-8d02b.firebasestorage.app",
+        messagingSenderId: "830140146359",
+        appId: "1:830140146359:web:dfbac10ec53d7ee76e2332"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+
+    let esRegistro = false;
+
+    // Alternar entre Login y Registro
+    document.getElementById('btnToggle').addEventListener('click', () => {
+        esRegistro = !esRegistro;
+        document.getElementById('registroExtra').classList.toggle('hidden');
+        document.getElementById('authTitle').innerText = esRegistro ? "Registro de Médico" : "Iniciar Sesión";
+        document.getElementById('btnPrincipal').innerText = esRegistro ? "Crear Cuenta" : "Ingresar";
+        document.getElementById('btnToggle').innerText = esRegistro ? "¿Ya tienes cuenta? Ingresa" : "¿No tienes cuenta? Regístrate";
+    });
+
+    document.getElementById('authForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value;
+        const pass = document.getElementById('pass').value;
+
+        try {
+            if (esRegistro) {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+                const user = userCredential.user;
+                // Guardar datos del perfil en la base de datos
+                await set(ref(db, 'usuarios/' + user.uid), {
+                    nombre: document.getElementById('nombreMed').value,
+                    dni: document.getElementById('dniMed').value,
+                    matricula: document.getElementById('matriculaMed').value,
+                    hospital: document.getElementById('hospitalMed').value,
+                    servicio: document.getElementById('servicioMed').value
+                });
+                alert("Cuenta creada con éxito");
+            } else {
+                await signInWithEmailAndPassword(auth, email, pass);
+            }
+            window.location.href = "index.html"; // Redirigir al formulario de pedidos
+        } catch (error) {
+            alert("Error: " + error.message);
+        }
+    });
+</script>
+</body>
+</html>

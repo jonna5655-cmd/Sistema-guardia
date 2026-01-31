@@ -3,10 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pedido de Traslado - Guardia</title>
+    <title>Pedido de Traslado - Sistema Hospitalario</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }
         .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        
+        /* Información del Médico */
+        .medico-info-bar { 
+            background: #eef4ff; padding: 10px; border-radius: 8px; margin-bottom: 20px; 
+            font-size: 0.85rem; border: 1px solid #d1e3ff; display: flex; justify-content: space-between; align-items: center;
+        }
+        .btn-logout { background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
+
         .hidden { display: none !important; }
         .sub-section { background: #f1f4f9; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 5px solid #007bff; }
         .radio-group { margin: 10px 0; display: flex; gap: 15px; align-items: center; }
@@ -31,11 +39,17 @@
         .paciente-info { font-weight: bold; color: #333; }
         .solicitud-tipo { font-size: 0.85em; background: #e9ecef; padding: 2px 8px; border-radius: 4px; color: #495057; }
         .btn-cancelar-pedido { background-color: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.75em; }
+        .firma-medico { font-size: 0.75em; color: #666; margin-top: 4px; display: block; }
     </style>
 </head>
 <body>
 
     <div class="container">
+        <div class="medico-info-bar">
+            <div id="datosMedico">Cargando profesional...</div>
+            <button class="btn-logout" id="btnLogout">Cerrar Sesión</button>
+        </div>
+
         <h2 style="text-align: center; color: #007bff;">📋 Nuevo Pedido</h2>
         
         <form id="pedidoForm">
@@ -47,12 +61,12 @@
 
             <div class="section">
                 <label>Servicio de Origen:</label>
-                <select id="servicioOrigen" class="select-servicios"></select>
+                <input type="text" id="servicioOrigen" readonly style="background-color: #e9ecef;" placeholder="Autocompletado">
             </div>
 
             <div class="section">
                 <label>¿Qué desea solicitar?:</label>
-                <select id="accionSolicitar">
+                <select id="accionSolicitar" required>
                     <option value="" disabled selected>Seleccione una opción...</option>
                     <option value="Estudios">Realizar Estudios (RX/TAC)</option>  
                     <option value="Traslado">Traslado a otro Servicio</option>  
@@ -86,7 +100,7 @@
 
             <div id="contenedorTraslado" class="hidden sub-section">
                 <label>Servicio de Destino:</label>
-                <select id="servicioDestino" class="select-servicios"></select>
+                <select id="servicioDestino"></select>
             </div>
 
             <div class="section">
@@ -124,7 +138,8 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getDatabase, ref, push, onValue, remove, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
         const firebaseConfig = { 
             apiKey: "AIzaSyAAaOmAIQ6GorJsSQAiFg-mUpnZJR2ivd4",
@@ -137,13 +152,32 @@
         };
 
         const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
         const db = getDatabase(app);
 
-        // Llenar Servicios
-        const servicios = ["Guardia de Adultos", "Guardia Pediatrica", "Guardia Obstetricia", "Cuidados Minimos", "Pediatria Internacion", "Cuidados Progresivos", "Cuidados Intensivos", "Quirofano", "Neonatologia"];
-        document.querySelectorAll('.select-servicios').forEach(s => servicios.forEach(serv => s.add(new Option(serv, serv))));
+        let medicoLogueado = null;
 
-        // Lógica de Interfaz
+        // 1. CONTROL DE SESIÓN Y CARGA DE DATOS DEL MÉDICO
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                const snapshot = await get(ref(db, `usuarios/${user.uid}`));
+                if (snapshot.exists()) {
+                    medicoLogueado = snapshot.val();
+                    document.getElementById('datosMedico').innerHTML = `<b>Dr/a. ${medicoLogueado.nombre}</b><br>Mat: ${medicoLogueado.matricula}`;
+                    document.getElementById('servicioOrigen').value = medicoLogueado.servicio;
+                }
+            } else {
+                // Si no hay usuario, devolver al login
+                window.location.href = "index.html";
+            }
+        });
+
+        // 2. LLENAR SERVICIOS DE DESTINO
+        const servicios = ["Guardia de Adultos", "Guardia Pediatrica", "Guardia Obstetricia", "Cuidados Minimos", "Pediatria Internacion", "Cuidados Progresivos", "Cuidados Intensivos", "Quirofano", "Neonatologia"];
+        const selectDestino = document.getElementById('servicioDestino');
+        servicios.forEach(s => selectDestino.add(new Option(s, s)));
+
+        // 3. LÓGICA DE INTERFAZ
         const accionSolicitar = document.getElementById('accionSolicitar');
         accionSolicitar.addEventListener('change', () => {
             document.getElementById('contenedorEstudios').classList.toggle('hidden', accionSolicitar.value !== "Estudios");
@@ -153,7 +187,7 @@
         document.getElementById('optRx').addEventListener('change', () => { document.getElementById('divRx').classList.remove('hidden'); document.getElementById('divTac').classList.add('hidden'); });
         document.getElementById('optTac').addEventListener('change', () => { document.getElementById('divTac').classList.remove('hidden'); document.getElementById('divRx').classList.add('hidden'); });
 
-        // Monitor en Tiempo Real
+        // 4. MONITOR EN TIEMPO REAL
         onValue(ref(db, 'pedidos'), (snapshot) => {
             const lista = document.getElementById('listaPendientes');
             lista.innerHTML = "";
@@ -165,10 +199,11 @@
                     item.className = `pedido-min ${p.prioridad === 'rojo' ? 'prioridad-rojo' : ''}`;
                     item.innerHTML = `
                         <div>
-                            <span class="paciente-info">${p.paciente}</span><br>
-                            <span class="solicitud-tipo">${p.estudio || p.solicitud}</span>
+                            <span class="paciente-info">${p.paciente}</span> <small>(DNI: ${p.dni})</small><br>
+                            <span class="solicitud-tipo">${p.estudio}</span>
+                            <span class="firma-medico">Solicitado por: ${p.medicoNombre} (${p.origen})</span>
                         </div>
-                        <button class="btn-cancelar-pedido" onclick="window.eliminarPedido('${key}')">CANCELAR</button>
+                        <button class="btn-cancelar-pedido" onclick="window.eliminarPedido('${key}')">LISTO</button>
                     `;
                     lista.appendChild(item);
                 });
@@ -177,9 +212,9 @@
             }
         });
 
-        window.eliminarPedido = (id) => { if(confirm("¿Desea cancelar el pedido?")) remove(ref(db, `pedidos/${id}`)); };
+        window.eliminarPedido = (id) => { if(confirm("¿El traslado fue finalizado?")) remove(ref(db, `pedidos/${id}`)); };
 
-        // ENVÍO DE DATOS
+        // 5. ENVÍO DE DATOS
         document.getElementById('btnEnviar').addEventListener('click', () => {
             const nombre = document.getElementById('nombreInput').value.trim();
             const dni = document.getElementById('dniInput').value.trim();
@@ -188,39 +223,50 @@
             const modo = document.getElementById('modoTraslado').value;
 
             if (!nombre || !dni || !accion) {
-                alert("Complete Nombre, DNI y qué desea solicitar.");
+                alert("Complete los campos del paciente y el tipo de solicitud.");
                 return;
             }
 
-            let detalleEstudio = "";
+            let detalleFinal = "";
             if (accion === "Estudios") {
                 const tipo = document.querySelector('input[name="tipo"]:checked')?.value;
-                if(!tipo) { alert("Seleccione si es RX o TAC"); return; }
+                if(!tipo) { alert("Seleccione RX o TAC"); return; }
                 const region = tipo === "rx" ? document.getElementById('regRx').value : document.getElementById('regTac').value;
                 const contraste = (tipo === "tac" && document.getElementById('conContraste').checked) ? " C/C" : "";
-                detalleEstudio = `${tipo.toUpperCase()} ${region}${contraste}`;
+                detalleFinal = `${tipo.toUpperCase()} ${region}${contraste} (${modo}${oxigeno === 'SI' ? ' + O2' : ''})`;
             } else {
-                detalleEstudio = `Traslado a ${document.getElementById('servicioDestino').value}`;
+                detalleFinal = `Traslado a ${document.getElementById('servicioDestino').value} (${modo}${oxigeno === 'SI' ? ' + O2' : ''})`;
             }
 
             const nuevoPedido = {
                 paciente: nombre,
                 dni: dni,
-                hora: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-                estudio: detalleEstudio,
-                traslado: modo,
-                oxigeno: oxigeno,
+                origen: medicoLogueado.servicio,
+                medicoNombre: medicoLogueado.nombre,
+                matricula: medicoLogueado.matricula,
+                estudio: detalleFinal,
                 prioridad: document.getElementById('prioridadSelect').value,
                 timestamp: Date.now()
             };
 
             push(ref(db, 'pedidos'), nuevoPedido).then(() => {
                 alert("🚀 Pedido enviado al camillero");
-                document.getElementById('pedidoForm').reset();
+                document.getElementById('nombreInput').value = "";
+                document.getElementById('dniInput').value = "";
+                document.getElementById('accionSolicitar').value = "";
                 document.getElementById('contenedorEstudios').classList.add('hidden');
                 document.getElementById('contenedorTraslado').classList.add('hidden');
             });
         });
+
+        // 6. CERRAR SESIÓN
+        document.getElementById('btnLogout').addEventListener('click', () => {
+            signOut(auth).then(() => window.location.href = "index.html");
+        });
     </script>
 </body>
 </html>
+
+
+
+        
