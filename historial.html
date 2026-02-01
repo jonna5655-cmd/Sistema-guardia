@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Servicio - Jefe de Servicio</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent-blue: #007bff;
+            --danger-red: #dc3545;
+            --success-green: #28a745;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f8f9fa; margin: 0; padding: 20px; color: var(--primary); }
+        .container { max-width: 900px; margin: auto; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        
+        .btn { padding: 10px 18px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: white; transition: opacity 0.2s; }
+        .btn:hover { opacity: 0.9; }
+        .btn-blue { background-color: var(--accent-blue); }
+        .btn-red { background-color: var(--danger-red); }
+
+        .search-container { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .search-box { flex: 2; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 1rem; min-width: 250px; }
+        .date-filter { flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 1rem; min-width: 150px; }
+
+        .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: white; padding: 15px; border-radius: 10px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-top: 4px solid var(--accent-blue); }
+        .stat-card span { display: block; font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .stat-card.estudio-color { border-top-color: var(--success-green); }
+
+        .table-container { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th { background: var(--primary); color: white; padding: 12px; text-align: left; }
+        td { padding: 12px; border-bottom: 1px solid #eee; }
+        tr:hover { background-color: #f1f7ff; }
+
+        .tag-finalizado { background: #d4edda; color: #155724; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.7rem; border: 1px solid #c3e6cb; }
+        .urgente { color: #dc3545; font-weight: bold; }
+        
+        @media (max-width: 600px) {
+            .table-container { overflow-x: auto; }
+            th, td { white-space: nowrap; }
+            .header { flex-direction: column; align-items: stretch; }
+        }
+        @media print {
+            .header, .search-container, .btn-red { display: none !important; }
+            body { padding: 0; }
+            .container { max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h2>📜 Historial de Servicio</h2>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-blue" onclick="exportarReporte()">📥 Exportar Reporte</button>
+                <button class="btn btn-red" onclick="limpiarHistorialCompleto()">🗑️ Limpiar Historial</button>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">Total Traslados<span id="totalTraslados">0</span></div>
+            <div class="stat-card estudio-color">Total (RX/TAC)<span id="totalEstudios">0</span></div>
+        </div>
+
+        <div class="search-container">
+            <input type="text" id="searchInput" class="search-box" placeholder="🔍 Buscar paciente, DNI o estudio...">
+            <input type="date" id="dateInput" class="date-filter">
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Finalizado</th>
+                        <th>Paciente</th>
+                        <th>DNI</th>
+                        <th>Detalle</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaCuerpo">
+                    <tr><td colspan="5" style="text-align:center; padding: 20px;">Cargando historial...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAAaOmAIQ6GorJsSQAiFg-mUpnZJR2ivd4",
+            authDomain: "appguardia-8d02b.firebaseapp.com",
+            databaseURL: "https://appguardia-8d02b-default-rtdb.firebaseio.com",
+            projectId: "appguardia-8d02b",
+            storageBucket: "appguardia-8d02b.firebasestorage.app",
+            messagingSenderId: "830140146359",
+            appId: "1:830140146359:web:dfbac10ec53d7ee76e2332"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const historialRef = ref(db, 'historial');
+
+        let todosLosRegistros = [];
+
+        onValue(historialRef, (snapshot) => {
+            const data = snapshot.val();
+            const tabla = document.getElementById('tablaCuerpo');
+            
+            if (data) {
+                todosLosRegistros = Object.values(data).sort((a, b) => {
+                    return (b.timestampFinalizado || 0) - (a.timestampFinalizado || 0);
+                });
+                aplicarFiltros();
+            } else {
+                todosLosRegistros = [];
+                tabla.innerHTML = "<tr><td colspan='5' style='text-align:center; padding: 20px;'>No hay registros en el historial.</td></tr>";
+                actualizarEstadisticas([]);
+            }
+        });
+
+        function renderizarTabla(lista) {
+            const tabla = document.getElementById('tablaCuerpo');
+            tabla.innerHTML = "";
+            lista.forEach(r => {
+                const fila = document.createElement('tr');
+                const esUrgente = r.prioridad === "rojo" ? "urgente" : "";
+                
+                // Si no hay fechaFinalizado, intentamos extraerla del objeto o usamos "S/F"
+                let fechaFinal = r.fechaFinalizado;
+                if(!fechaFinal && r.timestampFinalizado) {
+                    fechaFinal = new Date(r.timestampFinalizado).toLocaleDateString();
+                }
+
+                fila.innerHTML = `
+                    <td>
+                        <strong>${fechaFinal || 'S/F'}</strong><br>
+                        <small>${r.horaFinalizado || r.hora || '--:--'} hs</small>
+                    </td>
+                    <td class="${esUrgente}">${r.paciente}</td>
+                    <td>${r.dni || 'S/D'}</td>
+                    <td>
+                        <small style="color:#666;">${r.origen} ➔ ${r.estudio.includes('TRASLADO') ? 'Destino' : 'Estudio'}</small><br>
+                        <strong>${r.estudio}</strong> ${r.oxigeno === "SI" ? ' | 💧 O2' : ''}
+                    </td>
+                    <td><span class="tag-finalizado">COMPLETADO</span></td>
+                `;
+                tabla.appendChild(fila);
+            });
+            actualizarEstadisticas(lista);
+        }
+
+        function aplicarFiltros() {
+            const texto = document.getElementById('searchInput').value.toLowerCase();
+            const fecha = document.getElementById('dateInput').value; // Formato YYYY-MM-DD
+
+            const filtrados = todosLosRegistros.filter(r => {
+                const cumpleTexto = r.paciente.toLowerCase().includes(texto) || 
+                                    (r.dni && r.dni.toString().includes(texto)) ||
+                                    r.estudio.toLowerCase().includes(texto);
+                
+                let cumpleFecha = true;
+                if (fecha) {
+                    // Convertimos la fecha del registro (DD/MM/YYYY) a formato comparable o viceversa
+                    let fechaReg = r.fechaFinalizado; 
+                    if(!fechaReg && r.timestampFinalizado) {
+                        const d = new Date(r.timestampFinalizado);
+                        fechaReg = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+                    } else if (fechaReg) {
+                        // Si la fecha está en DD/MM/YYYY la pasamos a YYYY-MM-DD
+                        const partes = fechaReg.split('/');
+                        if(partes.length === 3) fechaReg = `${partes[2]}-${partes[1].padStart(2, '0')}-${partes[0].padStart(2, '0')}`;
+                    }
+                    cumpleFecha = (fechaReg === fecha);
+                }
+
+                return cumpleTexto && cumpleFecha;
+            });
+
+            renderizarTabla(filtrados);
+        }
+
+        function actualizarEstadisticas(lista) {
+            const estudios = lista.filter(r => 
+                r.estudio.toUpperCase().includes("RX") || r.estudio.toUpperCase().includes("TAC")
+            ).length;
+
+            const traslados = lista.filter(r => 
+                r.estudio.toUpperCase().includes("TRASLADO")
+            ).length;
+
+            document.getElementById('totalTraslados').innerText = traslados;
+            document.getElementById('totalEstudios').innerText = estudios;
+        }
+
+        document.getElementById('searchInput').addEventListener('input', aplicarFiltros);
+        document.getElementById('dateInput').addEventListener('change', aplicarFiltros);
+
+        window.limpiarHistorialCompleto = function() {
+            if (confirm("⚠️ ¿Está seguro de que desea BORRAR TODO el historial?")) {
+                if (confirm("❗ ¿REALMENTE desea eliminar todos los registros permanentemente?")) {
+                    remove(historialRef)
+                        .then(() => alert("✅ Historial vaciado correctamente."))
+                        .catch(err => alert("Error: " + err.message));
+                }
+            }
+        };
+
+        window.exportarReporte = () => { window.print(); };
+
+    </script>
+</body>
+</html>
