@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel del Camillero</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
+        .container { max-width: 500px; margin: auto; }
+        h2 { text-align: center; color: #2c3e50; }
+        
+        .card {
+            background: #fff;
+            border-left: 8px solid #3498db; 
+            margin: 15px 0;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .urgente-flash {
+            border: 3px solid #e74c3c !important;
+            animation: parpadeo 1.5s infinite;
+        }
+        @keyframes parpadeo {
+            0% { background-color: #fff; }
+            50% { background-color: #ffeaea; }
+            100% { background-color: #fff; }
+        }
+
+        .badge-urgente {
+            background-color: #e74c3c; color: white; padding: 8px; border-radius: 6px;
+            font-weight: bold; display: block; text-align: center; margin-bottom: 12px; font-size: 0.9rem;
+        }
+
+        .paciente-nombre { font-size: 1.2rem; font-weight: bold; color: #333; }
+        .hora-texto { color: #666; font-weight: bold; }
+        .dni-texto { margin: 10px 0; color: #555; font-size: 0.95rem; }
+
+        .tags-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        
+        .tag { padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; border: 1px solid rgba(0,0,0,0.1); }
+        .tag-estudio { background: #fff3cd; color: #856404; }
+        .tag-traslado { background: #d4edda; color: #155724; }
+        .tag-oxigeno { background: #d1ecf1; color: #0c5460; border-color: #bee5eb; }
+        .tag-no-oxigeno { background: #e2e3e5; color: #383d41; }
+
+        .btn-ok {
+            background: #28a745; color: white; border: none; padding: 14px; width: 100%;
+            border-radius: 8px; margin-top: 15px; font-weight: bold; font-size: 1rem; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>⏰ Pedidos Pendientes</h2>
+        <div id="listaPedidos">
+            <p style="text-align:center;">Conectando con Firebase...</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, onValue, remove, push, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAAaOmAIQ6GorJsSQAiFg-mUpnZJR2ivd4",
+            authDomain: "appguardia-8d02b.firebaseapp.com",
+            databaseURL: "https://appguardia-8d02b-default-rtdb.firebaseio.com",
+            projectId: "appguardia-8d02b",
+            storageBucket: "appguardia-8d02b.firebasestorage.app",
+            messagingSenderId: "830140146359",
+            appId: "1:830140146359:web:dfbac10ec53d7ee76e2332"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const pedidosRef = ref(db, 'pedidos');
+
+        let pedidosActivos = {};
+
+        onValue(pedidosRef, (snapshot) => {
+            const listaDiv = document.getElementById('listaPedidos');
+            listaDiv.innerHTML = ""; 
+            pedidosActivos = snapshot.val();
+            
+            if (pedidosActivos) {
+                Object.keys(pedidosActivos).forEach(id => {
+                    const p = pedidosActivos[id];
+                    
+                    // --- CORRECCIÓN DE VARIABLES ---
+                    const nombre = p.paciente || p.nombre || "Sin Nombre";
+                    const dni = p.dni || p.documento || "S/D";
+                    const hora = p.hora || p.horario || "--:--";
+                    const estudio = p.estudio || p.tipo || "ESTUDIO";
+                    
+                    // Busca el tipo de traslado (Silla o Camilla)
+                    const traslado = p.traslado || p.metodo || p.transporte || "TRASLADO";
+                    
+                    // Lógica para el Oxígeno: detecta "SI", "si", o true
+                    const tieneOxigeno = (String(p.oxigeno).toUpperCase() === "SI" || p.oxigeno === true);
+
+                    // Prioridad
+                    const esUrgente = (p.prioridad === "rojo" || p.urgencia === "SI");
+
+                    const card = document.createElement('div');
+                    card.className = `card ${esUrgente ? 'urgente-flash' : ''}`;
+                    
+                    card.innerHTML = `
+                        ${esUrgente ? '<span class="badge-urgente">⚠️ ¡TRASLADO URGENTE! ⚠️</span>' : ''}
+                        <div style="display:flex; justify-content:space-between; align-items: center;">
+                            <span class="paciente-nombre">${nombre}</span>
+                            <span class="hora-texto">${hora} hs</span>
+                        </div>
+                        <p class="dni-texto"><strong>DNI:</strong> ${dni}</p>
+                        
+                        <div class="tags-container">
+                            <span class="tag tag-estudio">📋 ${estudio}</span>
+                            <span class="tag tag-traslado">🚑 ${traslado}</span>
+                            <span class="tag ${tieneOxigeno ? 'tag-oxigeno' : 'tag-no-oxigeno'}">
+                                ${tieneOxigeno ? '💧 OXÍGENO: SÍ' : 'SIN OXÍGENO'}
+                            </span>
+                        </div>
+
+                        <button class="btn-ok" onclick="finalizarPedido('${id}')">✓ FINALIZAR TRASLADO</button>
+                    `;
+                    listaDiv.appendChild(card);
+                });
+            } else {
+                listaDiv.innerHTML = "<p style='text-align:center;'>✅ No hay traslados pendientes.</p>";
+            }
+        });
+
+        window.finalizarPedido = function(id) {
+            if(confirm("¿Confirmar finalización del traslado?")) {
+                const historialRef = ref(db, 'historial');
+                const registroFinal = {
+                    ...pedidosActivos[id],
+                    horaFinalizado: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                    fechaFinalizado: new Date().toLocaleDateString(),
+                    timestampServer: serverTimestamp()
+                };
+
+                push(historialRef, registroFinal).then(() => {
+                    remove(ref(db, 'pedidos/' + id));
+                });
+            }
+        };
+    </script>
+</body>
+</html>
