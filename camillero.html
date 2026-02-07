@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel del Camillero - HHM</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --azul-oscuro: #003366;
+            --azul-medio: #005bb5;
+            --celeste-claro: #add8e6;
+            --verde-medico: #27ae60;
+            --blanco-cristal: rgba(255, 255, 255, 0.85);
+            --peligro: #ef4444;
+            --advertencia: #f59e0b;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #f0faff 0%, #add8e6 50%, #81d4fa 100%);
+            background-attachment: fixed;
+            display: flex; 
+            justify-content: center; 
+            margin: 0; 
+            padding: 15px;
+            min-height: 100vh;
+        }
+
+        .container { 
+            width: 100%;
+            max-width: 500px; 
+        }
+
+        .header-panel {
+            background: var(--blanco-cristal);
+            padding: 20px;
+            border-radius: 24px 24px 0 0;
+            backdrop-filter: blur(12px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-bottom: none;
+        }
+
+        h2 { margin: 0; color: var(--azul-oscuro); font-size: 1.2rem; font-weight: 700; }
+
+        .btn-logout {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--peligro);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            padding: 8px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+        }
+
+        .user-info-bar {
+            background: var(--blanco-cristal);
+            padding: 12px 20px;
+            border-radius: 0 0 24px 24px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(12px);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-top: 2px solid var(--verde-medico);
+            box-shadow: 0 10px 20px rgba(0, 51, 102, 0.05);
+        }
+
+        .user-dot { height: 8px; width: 8px; background-color: var(--verde-medico); border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
+        
+        .user-text { font-size: 0.85rem; color: #4b5563; font-weight: 500; }
+        .user-text b { color: var(--azul-oscuro); }
+
+        .bloqueo-msg {
+            text-align: center;
+            padding: 40px 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 24px;
+            border: 2px solid var(--peligro);
+            margin-top: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 8px 20px rgba(0, 51, 102, 0.08);
+            border-left: 8px solid var(--azul-medio);
+            position: relative;
+        }
+
+        .card-en-curso { border-left-color: var(--advertencia); background-color: #fffbeb; }
+
+        .urgente-flash { 
+            border: 2px solid var(--peligro);
+            animation: flashBg 1.5s infinite;
+        }
+        @keyframes flashBg { 0% { box-shadow: 0 0 0 rgba(239,68,68,0); } 50% { box-shadow: 0 0 15px rgba(239,68,68,0.3); } 100% { box-shadow: 0 0 0 rgba(239,68,68,0); } }
+
+        .badge-urgente { 
+            background: var(--peligro); color: white; padding: 6px; border-radius: 10px; 
+            font-size: 0.75rem; font-weight: 800; display: block; text-align: center; margin-bottom: 12px;
+        }
+
+        .badge-proceso { 
+            background: var(--advertencia); color: white; padding: 4px 10px; border-radius: 8px; 
+            font-weight: 800; font-size: 0.65rem; position: absolute; top: 15px; right: 15px; 
+        }
+
+        .paciente-nombre { font-size: 1.15rem; font-weight: 700; color: var(--azul-oscuro); display: block; }
+        .badge-o2 { background: #00bcd4; color: white; padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; }
+
+        .btn-accion {
+            border: none; padding: 14px; width: 100%; border-radius: 14px; 
+            margin-top: 15px; font-weight: 700; font-size: 1rem; cursor: pointer;
+        }
+        .btn-iniciar { background: var(--azul-oscuro); color: white; }
+        .btn-finalizar { background: var(--verde-medico); color: white; }
+
+        #listaPedidos { padding-bottom: 40px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-panel">
+            <h2>🦽 Panel Camilleros</h2>
+            <button class="btn-logout" id="btnLogout">Cerrar Sesión</button>
+        </div>
+
+        <div class="user-info-bar">
+            <span class="user-dot"></span>
+            <span class="user-text" id="userNameText">Validando sesión...</span>
+        </div>
+
+        <div id="listaPedidos">
+            <p style="text-align:center; color: var(--azul-oscuro); font-weight: 500;">Cargando tareas...</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getDatabase, ref, onValue, remove, push, update, serverTimestamp, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAAaOmAIQ6GorJsSQAiFg-mUpnZJR2ivd4",
+            authDomain: "appguardia-8d02b.firebaseapp.com",
+            databaseURL: "https://appguardia-8d02b-default-rtdb.firebaseio.com",
+            projectId: "appguardia-8d02b",
+            storageBucket: "appguardia-8d02b.firebasestorage.app",
+            messagingSenderId: "830140146359",
+            appId: "1:830140146359:web:dfbac10ec53d7ee76e2332"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const auth = getAuth(app);
+
+        let camilleroData = null;
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                get(ref(db, 'usuarios/camilleros/' + user.uid)).then((snapshot) => {
+                    if (snapshot.exists()) {
+                        camilleroData = snapshot.val();
+                        
+                        // Normalizamos el tag para Kodular
+                        let miFiltro = camilleroData.turno.includes("Noche") ? "Noche" : camilleroData.turno;
+                        
+                        // RE-SINCRO CON KODULAR (Por si se cerró la app)
+                        if (window.AppInventor) {
+                            window.AppInventor.setWebViewString("login_" + miFiltro);
+                        }
+
+                        document.getElementById('userNameText').innerHTML = `Personal: <b>${camilleroData.nombre}</b> | Turno: ${camilleroData.turno}`;
+                        validarYEscuchar();
+                    }
+                });
+            } else {
+                window.location.href = "login-camillero.html";
+            }
+        });
+
+        function validarYEscuchar() {
+            const ahora = new Date();
+            const dia = ahora.getDay(); 
+            const hora = ahora.getHours();
+            const min = ahora.getMinutes();
+            const horaDecimal = hora + (min / 60);
+            
+            let estaDeGuardia = false;
+            const esFinde = (dia === 0 || dia === 6);
+
+            // Lógica de validación de guardia (igual a la tuya)
+            if (camilleroData.turno === "Franquero") {
+                if (esFinde && (horaDecimal >= 7 && horaDecimal < 21)) estaDeGuardia = true;
+            }
+            else if (camilleroData.turno === "Mañana") {
+                if (!esFinde && (horaDecimal >= 7 && horaDecimal < 14)) estaDeGuardia = true;
+            }
+            else if (camilleroData.turno === "Tarde") {
+                if (!esFinde && (horaDecimal >= 14 && horaDecimal < 21)) estaDeGuardia = true;
+            }
+            else if (camilleroData.turno.includes("Noche")) {
+                if (horaDecimal >= 21 || horaDecimal < 7) estaDeGuardia = true;
+            }
+
+            const listaDiv = document.getElementById('listaPedidos');
+
+            if (!estaDeGuardia) {
+                listaDiv.innerHTML = `<div class="bloqueo-msg"><h3 style="color:var(--peligro)">🚫 ACCESO RESTRINGIDO</h3><p>Fuera de horario de guardia.</p></div>`;
+                return; 
+            }
+
+            onValue(ref(db, 'pedidos'), (snapshot) => {
+                listaDiv.innerHTML = ""; 
+                const data = snapshot.val();
+                if (data) {
+                    let hayPedidos = false;
+                    let miFiltro = camilleroData.turno.includes("Noche") ? "Noche" : camilleroData.turno;
+
+                    Object.keys(data).forEach(id => {
+                        const p = data[id];
+                        if (p.turnoObjetivo === miFiltro) {
+                            hayPedidos = true;
+                            const esUrgente = p.prioridad === "rojo";
+                            const enCurso = p.estado === "en-curso";
+                            
+                            const card = document.createElement('div');
+                            card.className = `card ${esUrgente ? 'urgente-flash' : ''} ${enCurso ? 'card-en-curso' : ''}`;
+                            card.innerHTML = `
+                                ${enCurso ? '<span class="badge-proceso">⏱ EN CURSO</span>' : ''}
+                                ${esUrgente ? '<span class="badge-urgente">🚨 TRASLADO URGENTE 🚨</span>' : ''}
+                                <span style="font-size:0.75rem; color:#9ca3af;">🕒 ${p.hora}</span><br>
+                                <span class="paciente-nombre">${p.paciente}</span>
+                                <span style="font-size:0.85rem; color:#6b7280;">DNI: ${p.dni || '---'}</span>
+                                <p><strong>Origen:</strong> ${p.origen}<br><strong>Tarea:</strong> ${p.estudio}</p>
+                                <p><strong>Oxígeno:</strong> ${p.oxigeno === "SI" ? '<span class="badge-o2">SÍ</span>' : 'NO'}</p>
+                                <div class="medico-info">Solicitante: Dr/a. ${p.medicoNombre}</div>
+                                ${enCurso 
+                                    ? `<button class="btn-accion btn-finalizar" onclick="finalizarPedido('${id}')">✓ FINALIZAR ENTREGA</button>`
+                                    : `<button class="btn-accion btn-iniciar" onclick="iniciarPedido('${id}')">▶ INICIAR TRASLADO</button>`
+                                }
+                            `;
+                            listaDiv.appendChild(card);
+                        }
+                    });
+                    if (!hayPedidos) listaDiv.innerHTML = "<p style='text-align:center; opacity:0.6; margin-top:40px;'>✅ Sin tareas pendientes.</p>";
+                } else {
+                    listaDiv.innerHTML = "<p style='text-align:center; opacity:0.6; margin-top:40px;'>✅ Sin pedidos activos.</p>";
+                }
+            });
+        }
+
+        window.iniciarPedido = (id) => update(ref(db, `pedidos/${id}`), { estado: "en-curso" });
+
+        window.finalizarPedido = (id) => {
+            if(confirm("¿Confirmar entrega del paciente?")) {
+                get(ref(db, `pedidos/${id}`)).then(snap => {
+                    if(snap.exists()){
+                        push(ref(db, 'historial'), {
+                            ...snap.val(),
+                            camillero: camilleroData.nombre,
+                            horaFin: new Date().toLocaleTimeString(),
+                            timestampFinalizado: serverTimestamp()
+                        }).then(() => remove(ref(db, `pedidos/${id}`)));
+                    }
+                });
+            }
+        };
+
+        document.getElementById('btnLogout').addEventListener('click', () => {
+            if(confirm("¿Desea cerrar sesión?")) {
+                // Limpiamos tags en Kodular para dejar de recibir notificaciones
+                if (window.AppInventor) {
+                    window.AppInventor.setWebViewString("logout");
+                }
+                signOut(auth).then(() => { window.location.href = "login-camillero.html"; });
+            }
+        });
+    </script>
+</body>
+</html>
