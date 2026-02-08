@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Camilleros - Hospital HHM</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    
+    <style>
+        :root {
+            --azul-oscuro: #003366;
+            --azul-medio: #005bb5;
+            --celeste-claro: #add8e6;
+            --verde-online: #2ecc71;
+            --blanco-cristal: rgba(255, 255, 255, 0.85);
+            --peligro: #ef4444;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #f0faff 0%, #add8e6 50%, #81d4fa 100%);
+            background-attachment: fixed;
+            display: flex; 
+            justify-content: center; 
+            margin: 0; 
+            padding: 15px;
+            min-height: 100vh;
+        }
+
+        .container { 
+            width: 100%;
+            max-width: 500px; 
+            background: var(--blanco-cristal); 
+            padding: 25px; 
+            border-radius: 28px; 
+            backdrop-filter: blur(12px); 
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 20px 40px rgba(0, 51, 102, 0.15); 
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-sizing: border-box;
+            height: fit-content;
+        }
+
+        .user-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255, 255, 255, 0.6);
+            padding: 12px 18px;
+            border-radius: 22px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(0, 51, 102, 0.05);
+        }
+
+        .user-info { display: flex; align-items: center; gap: 10px; }
+        .user-name { font-weight: 700; color: var(--azul-oscuro); font-size: 0.9rem; }
+
+        .status-circle {
+            width: 10px; height: 10px; background-color: var(--verde-online);
+            border-radius: 50%; animation: pulse-green 2s infinite;
+        }
+
+        @keyframes pulse-green {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(46, 204, 113, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
+        }
+
+        .btn-logout {
+            background: rgba(239, 68, 68, 0.1); color: var(--peligro);
+            border: none; padding: 6px 12px; border-radius: 12px;
+            font-size: 0.75rem; font-weight: 700; cursor: pointer;
+        }
+
+        .header-camillero { text-align: center; margin-bottom: 20px; }
+        h2 { color: var(--azul-oscuro); font-weight: 700; margin: 0; font-size: 1.4rem; }
+        
+        .badge-turno {
+            display: inline-block; background: var(--azul-oscuro); color: white;
+            padding: 4px 12px; border-radius: 50px; font-size: 0.8rem;
+            font-weight: 600; margin-top: 5px;
+        }
+
+        .pedido-min { 
+            background: #fff; padding: 18px; border-radius: 20px; 
+            margin-bottom: 12px; border-left: 6px solid var(--celeste-claro);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+            position: relative;
+        }
+
+        .prioridad-rojo { border-left-color: var(--peligro) !important; }
+        .estado-en-curso { border-left-color: #f1c40f !important; background-color: #fffdf2; }
+
+        .paciente-info { font-weight: 700; color: var(--azul-oscuro); font-size: 1.1rem; }
+        .paciente-dni { font-size: 0.85rem; color: #6b7280; font-weight: 600; display: block; margin: 2px 0; }
+        .solicitud-tipo { font-size: 0.85rem; background: #f3f4f6; padding: 4px 10px; border-radius: 8px; color: #4b5563; margin: 8px 0; display: inline-block; }
+        
+        .btn-accion {
+            width: 100%; padding: 12px; border: none; border-radius: 12px;
+            font-weight: 700; cursor: pointer; transition: 0.2s; margin-top: 10px;
+        }
+        .btn-iniciar { background: var(--azul-medio); color: white; }
+        .btn-finalizar { background: var(--verde-online); color: white; }
+
+        #empty-msg { text-align: center; color: #6b7280; font-style: italic; margin-top: 30px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="user-bar">
+            <div class="user-info">
+                <div class="status-circle"></div>
+                <span class="user-name" id="nombreCamillero">Cargando...</span>
+            </div>
+            <button class="btn-logout" id="btnLogout">CERRAR SESIÓN</button>
+        </div>
+
+        <div class="header-camillero">
+            <h2>Traslados Pendientes</h2>
+            <div id="labelTurno" class="badge-turno">Turno: ---</div>
+        </div>
+
+        <div id="listaPedidos">
+            <div id="empty-msg">Sincronizando pedidos...</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getDatabase, ref, onValue, update, remove, get, push, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const firebaseConfig = { 
+            apiKey: "AIzaSyAAaOmAIQ6GorJsSQAiFg-mUpnZJR2ivd4",
+            authDomain: "appguardia-8d02b.firebaseapp.com",
+            databaseURL: "https://appguardia-8d02b-default-rtdb.firebaseio.com",
+            projectId: "appguardia-8d02b",
+            storageBucket: "appguardia-8d02b.firebasestorage.app",
+            messagingSenderId: "830140146359",
+            appId: "1:830140146359:web:dfbac10ec53d7ee76e2332"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getDatabase(app);
+
+        let camilleroData = null;
+        window.OneSignalDeferred = window.OneSignalDeferred || [];
+
+        // --- SESIÓN Y FILTRO ---
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                const snap = await get(ref(db, 'usuarios/camilleros/' + user.uid));
+                if (snap.exists()) {
+                    camilleroData = snap.val();
+                    document.getElementById('nombreCamillero').innerText = camilleroData.nombre;
+                    
+                    let miFiltro = camilleroData.turno.includes("Noche") ? "Noche" : camilleroData.turno;
+                    document.getElementById('labelTurno').innerText = "Turno: " + camilleroData.turno;
+
+                    // OneSignal Tagging
+                    OneSignalDeferred.push(async function(OneSignal) {
+                        await OneSignal.init({ appId: "b9f065db-e3ac-4a32-9a98-32c6dd5b278a" });
+                        OneSignal.sendTag("turno", miFiltro);
+                    });
+
+                    escucharPedidos(miFiltro);
+                }
+            } else {
+                window.location.href = "login-camillero.html";
+            }
+        });
+
+        function escucharPedidos(miFiltro) {
+            onValue(ref(db, 'pedidos'), (snapshot) => {
+                const container = document.getElementById('listaPedidos');
+                container.innerHTML = "";
+                const data = snapshot.val();
+                let hayPedidos = false;
+
+                if (data) {
+                    Object.keys(data).forEach(key => {
+                        const p = data[key];
+                        if (p.turnoObjetivo === miFiltro) {
+                            hayPedidos = true;
+                            const enCurso = p.estado === "en-curso";
+                            const card = document.createElement('div');
+                            card.className = `pedido-min ${p.prioridad === 'rojo' ? 'prioridad-rojo' : ''} ${enCurso ? 'estado-en-curso' : ''}`;
+                            
+                            card.innerHTML = `
+                                <span class="paciente-info">${p.paciente}</span>
+                                <span class="paciente-dni">DNI: ${p.dni || 'S/D'}</span>
+                                <span class="solicitud-tipo">${p.estudio}</span>
+                                <div style="font-size: 0.8rem; color: #666; margin-bottom: 10px;">
+                                    📍 ${p.origen} | 🕒 ${p.hora} ${p.oxigeno === 'SI' ? ' | <b style="color:red">O2</b>' : ''}
+                                </div>
+                                <button class="btn-accion ${enCurso ? 'btn-finalizar' : 'btn-iniciar'}" id="btn-${key}">
+                                    ${enCurso ? 'FINALIZAR TRASLADO' : 'INICIAR TRASLADO'}
+                                </button>
+                            `;
+                            container.appendChild(card);
+
+                            document.getElementById(`btn-${key}`).onclick = () => {
+                                if (!enCurso) {
+                                    update(ref(db, `pedidos/${key}`), { estado: "en-curso" });
+                                } else {
+                                    if (confirm("¿Confirmar entrega del paciente?")) {
+                                        push(ref(db, 'historial'), {
+                                            ...p,
+                                            camillero: camilleroData.nombre,
+                                            fechaFin: new Date().toLocaleDateString(),
+                                            horaFin: new Date().toLocaleTimeString(),
+                                            timestampFinalizado: serverTimestamp()
+                                        }).then(() => remove(ref(db, `pedidos/${key}`)));
+                                    }
+                                }
+                            };
+                        }
+                    });
+                }
+                if (!hayPedidos) container.innerHTML = '<div id="empty-msg">Sin traslados para su turno.</div>';
+            });
+        }
+
+        // --- SALIDA ---
+        document.getElementById('btnLogout').onclick = () => {
+            if (confirm("¿Cerrar sesión? Dejarás de recibir notificaciones.")) {
+                OneSignalDeferred.push(function(OneSignal) {
+                    OneSignal.deleteTag("turno");
+                });
+                signOut(auth).then(() => { window.location.href = "login-camillero.html"; });
+            }
+        };
+    </script>
+</body>
+</html>
