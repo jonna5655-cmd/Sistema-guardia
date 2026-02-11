@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perfil Médico - HHM</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <style>
+        :root {
+            --azul-oscuro: #003366;
+            --azul-medio: #005bb5;
+            --verde-sello: #1a5a3a;
+            --blanco-cristal: rgba(255, 255, 255, 0.95);
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #f0faff 0%, #add8e6 100%);
+            background-attachment: fixed;
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center;
+            min-height: 100vh; 
+            margin: 0; 
+            padding: 20px;
+            perspective: 1000px;
+            box-sizing: border-box;
+        }
+
+        .card-container {
+            width: 350px; 
+            height: 520px; 
+            cursor: pointer;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-bottom: 25px;
+        }
+
+        .card-container.flipped { transform: rotateY(180deg); }
+
+        .card-face {
+            position: absolute; 
+            top: 0; left: 0;
+            width: 100%; 
+            height: 100%; 
+            backface-visibility: hidden;
+            border-radius: 30px;
+            overflow: hidden;
+            background: var(--blanco-cristal);
+            box-shadow: 0 15px 35px rgba(0, 51, 102, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+
+        .header-azul {
+            background: var(--azul-oscuro);
+            padding: 30px 20px 60px 20px;
+            color: white; text-align: center;
+        }
+
+        .foto-container {
+            width: 120px; height: 120px;
+            background: #fff; border: 4px solid white; border-radius: 50%;
+            margin: -60px auto 15px auto;
+            position: relative; overflow: hidden;
+            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        }
+        .foto-container img { width: 100%; height: 100%; object-fit: cover; }
+
+        .info-main { padding: 0 25px 20px 25px; text-align: center; flex-grow: 1; }
+        .nombre-medico { 
+            color: var(--azul-oscuro); 
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: block; 
+            font-size: 1.4rem; 
+            font-weight: 800; 
+            margin: 5px 0; 
+        }
+
+        .matricula-badge {
+            display: inline-block; background: var(--verde-sello); color: white;
+            padding: 4px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 700;
+            margin-bottom: 15px;
+        }
+
+        .dato-fila {
+            display: flex; justify-content: space-between; padding: 10px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.05); text-align: left;
+        }
+        .label { color: #94a3b8; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }
+        .valor { color: #475569; font-size: 0.85rem; font-weight: 700; }
+
+        .card-back { 
+            transform: rotateY(180deg); 
+            justify-content: center; 
+            align-items: center; 
+            padding: 30px;
+        }
+
+        .sello-medico {
+            border: 4px double var(--verde-sello);
+            color: var(--verde-sello);
+            padding: 15px; text-align: center;
+            transform: rotate(-6deg);
+            background: rgba(26, 90, 58, 0.03);
+            border-radius: 4px;
+            margin-bottom: 25px;
+            width: 85%;
+        }
+
+        #qrcode { background: white; padding: 10px; border-radius: 12px; }
+
+        .btn-panel {
+            background: var(--azul-oscuro);
+            color: white; border: none;
+            padding: 14px 30px; border-radius: 15px;
+            font-weight: 700; font-size: 1rem;
+            cursor: pointer; box-shadow: 0 10px 20px rgba(0, 51, 102, 0.2);
+            transition: all 0.3s ease;
+            width: 100%; max-width: 350px;
+        }
+        .btn-panel:hover { background: var(--azul-medio); transform: translateY(-2px); }
+    </style>
+</head>
+<body>
+
+<div class="card-container" id="card" onclick="this.classList.toggle('flipped')">
+    <div class="card-face">
+        <div class="header-azul">
+            <h2 style="margin:0; font-size: 1.1rem;">H.Z.G.A Heroes de Malvinas</h2>
+            <p style="font-size: 0.75rem; opacity: 0.8; margin-top: 5px;">Credencial Digital de Profesional</p>
+        </div>
+        <div class="foto-container" onclick="event.stopPropagation(); document.getElementById('fileInput').click();">
+            <img id="profileImg" src="https://cdn-icons-png.flaticon.com/512/3774/3774299.png">
+        </div>
+        <div class="info-main">
+            <div class="nombre-medico" id="frontNombre">Cargando...</div>
+            <div class="matricula-badge" id="frontMatricula">M.P. ---</div>
+            <div class="dato-fila"><span class="label">DNI</span><span class="valor" id="frontDni">---</span></div>
+            <div class="dato-fila"><span class="label">Hospital</span><span class="valor">H. Horacio Heller</span></div>
+            <div class="dato-fila"><span class="label">Teléfono</span><input type="tel" id="inputTel" style="border:none; background:transparent; font-weight:700; color:var(--azul-medio); text-align:right; width: 120px;" placeholder="Completar"></div>
+            <p style="font-size: 0.6rem; color: #94a3b8; margin-top: 25px; font-weight: 800; letter-spacing: 1px;">TAP PARA GIRAR</p>
+        </div>
+    </div>
+
+    <div class="card-face card-back">
+        <div class="sello-medico">
+            <div style="font-size: 1.2rem; font-weight: 900;" id="selloNombre">DR. ---</div>
+            <div style="font-size: 1rem; font-weight: 700; border-top: 2px solid var(--verde-sello); margin-top: 5px;" id="selloMatricula">M.P. ---</div>
+        </div>
+        <div id="qrcode"></div>
+        <p style="font-size: 0.65rem; color: var(--verde-sello); font-weight: 800; margin-top: 15px;">La credencial verifica la identidad legal del profesional autorizado.</p>
+    </div>
+</div>
+
+<button class="btn-panel" onclick="window.location.href='index.html'">VOLVER AL PANEL PRINCIPAL</button>
+<input type="file" id="fileInput" style="display:none" accept="image/*">
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getDatabase, ref, get, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const firebaseConfig = { 
+        apiKey: "AIzaSyAAaOmAIQ6GorJsSQAiFg-mUpnZJR2ivd4",
+        authDomain: "appguardia-8d02b.firebaseapp.com",
+        databaseURL: "https://appguardia-8d02b-default-rtdb.firebaseio.com",
+        projectId: "appguardia-8d02b",
+        storageBucket: "appguardia-8d02b.firebasestorage.app",
+        messagingSenderId: "830140146359",
+        appId: "1:830140146359:web:dfbac10ec53d7ee76e2332"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+
+    // Variable global para guardar la ruta real del médico una vez encontrada
+    let rutaMedicoReal = "";
+
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            const medicosRef = ref(db, 'usuarios/Medicos');
+            const snapshot = await get(medicosRef);
+            
+            if (snapshot.exists()) {
+                const medicos = snapshot.val();
+                let datosMedico = null;
+
+                // Buscamos al médico que coincida con el UID del usuario logueado
+                for (let key in medicos) {
+                    if (medicos[key].uid === user.uid) {
+                        datosMedico = medicos[key];
+                        rutaMedicoReal = `usuarios/Medicos/${key}`; // Guardamos la ruta (Ej: usuarios/Medicos/Ruben_garcia_...)
+                        break;
+                    }
+                }
+
+                if (datosMedico) {
+                    document.getElementById('frontNombre').innerText = datosMedico.nombre;
+                    document.getElementById('frontMatricula').innerText = "M.P. " + datosMedico.matricula;
+                    document.getElementById('frontDni').innerText = datosMedico.dni;
+                    document.getElementById('selloNombre').innerText = "DR. " + datosMedico.nombre.toUpperCase();
+                    document.getElementById('selloMatricula').innerText = "M.P. " + datosMedico.matricula;
+                    if(datosMedico.telefono) document.getElementById('inputTel').value = datosMedico.telefono;
+                    if(datosMedico.fotoPerfil) document.getElementById('profileImg').src = datosMedico.fotoPerfil;
+                    generarQR(datosMedico.nombre, datosMedico.matricula);
+                } else {
+                    console.error("No se encontró el perfil del médico.");
+                }
+            }
+        } else { window.location.href = "login.html"; }
+    });
+
+    function generarQR(nombre, mp) {
+        document.getElementById("qrcode").innerHTML = "";
+        new QRCode(document.getElementById("qrcode"), {
+            text: `PROFESIONAL: ${nombre}\nMP: ${mp}`,
+            width: 110, height: 110, colorDark : "#003366"
+        });
+    }
+
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file && rutaMedicoReal) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = async () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 400;
+                    const scaleSize = MAX_WIDTH / img.width;
+                    canvas.width = MAX_WIDTH;
+                    canvas.height = img.height * scaleSize;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const optimizedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                    
+                    document.getElementById('profileImg').src = optimizedBase64;
+                    // Actualizamos usando la ruta personalizada encontrada
+                    await update(ref(db, rutaMedicoReal), { fotoPerfil: optimizedBase64 });
+                };
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    document.getElementById('inputTel').addEventListener('change', async (e) => {
+        if (rutaMedicoReal) {
+            await update(ref(db, rutaMedicoReal), { telefono: e.target.value });
+        }
+    });
+</script>
+
+</body>
+</html>
