@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Servicio - HHM</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --azul-oscuro: #003366;
+            --azul-medio: #005bb5;
+            --verde-medico: #27ae60;
+            --peligro: #ef4444;
+            --bg-body: #f1f5f9;
+            --blanco-cristal: rgba(255, 255, 255, 0.9);
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            margin: 0; 
+            padding: 0; 
+            color: #1e293b;
+            min-height: 100vh;
+        }
+
+        /* Pantalla de Login */
+        #login-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--azul-oscuro); display: flex; align-items: center;
+            justify-content: center; z-index: 1000;
+        }
+        .login-box {
+            background: white; padding: 40px; border-radius: 28px;
+            text-align: center; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            width: 90%; max-width: 380px;
+        }
+        .login-box h3 { color: var(--azul-oscuro); margin-bottom: 10px; font-weight: 800; }
+        .login-box input {
+            width: 100%; padding: 14px; margin: 20px 0;
+            border: 1.5px solid #e2e8f0; border-radius: 14px; font-size: 1rem;
+            text-align: center; outline: none; box-sizing: border-box;
+        }
+
+        /* Contenido Principal (Oculto inicialmente) */
+        #main-content {
+            display: none;
+            padding: 20px;
+        }
+
+        .container { max-width: 1100px; margin: auto; animation: fadeIn 0.5s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-bottom: 25px; flex-wrap: wrap; gap: 15px; 
+            background: var(--blanco-cristal); padding: 25px; border-radius: 24px;
+            backdrop-filter: blur(10px); border: 1px solid white;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+        }
+        .header h2 { margin: 0; color: var(--azul-oscuro); font-weight: 800; font-size: 1.5rem; }
+
+        .btn { padding: 12px 20px; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; transition: 0.2s; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; }
+        .btn-blue { background-color: var(--azul-oscuro); color: white; }
+        .btn-green { background-color: var(--verde-medico); color: white; }
+        .btn-red { background-color: #fee2e2; color: var(--peligro); }
+
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .stat-card { 
+            background: white; padding: 20px; border-radius: 20px; text-align: center; 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); border-bottom: 4px solid var(--azul-medio); 
+        }
+        .stat-card span { display: block; font-size: 2.2rem; font-weight: 800; color: var(--azul-oscuro); }
+        .stat-card p { margin: 5px 0 0; color: #64748b; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; }
+
+        .filters-grid { 
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+            gap: 12px; margin-bottom: 20px; 
+        }
+        .filter-input { 
+            padding: 14px; border: 1px solid #e2e8f0; border-radius: 14px; 
+            font-size: 0.9rem; outline: none; background: white; font-family: 'Inter';
+        }
+
+        .table-container { 
+            background: white; border-radius: 24px; overflow: hidden; 
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05); border: 1px solid #f1f5f9; 
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8fafc; color: #64748b; padding: 18px; text-align: left; font-size: 0.75rem; text-transform: uppercase; border-bottom: 1px solid #f1f5f9; }
+        td { padding: 18px; border-bottom: 1px solid #f8fafc; font-size: 0.9rem; }
+        
+        .badge-finalizado { background: #dcfce7; color: #166534; padding: 5px 12px; border-radius: 10px; font-weight: 800; font-size: 0.7rem; }
+        .tag-estudio { color: var(--azul-medio); font-weight: 700; }
+
+        @media print {
+            .header, .filters-grid, .btn-red, #login-screen { display: none !important; }
+            #main-content { display: block !important; padding: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen">
+        <div class="login-box">
+            <h3>🔐 Acceso Historial</h3>
+            <p style="color: #64748b; font-size: 0.85rem;">Ingrese la clave de gestión</p>
+            <input type="password" id="passInput" placeholder="Contraseña">
+            <button class="btn btn-blue" style="width: 100%; justify-content: center;" id="btnEntrar">ACCEDER AL PANEL</button>
+        </div>
+    </div>
+
+    <div id="main-content">
+        <div class="container">
+            <div class="header">
+                <h2>📜 Historial General</h2>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-green" onclick="exportarExcel()">📥 Excel</button>
+                    <button class="btn btn-blue" onclick="window.print()">🖨️ Imprimir</button>
+                    <button class="btn btn-red" onclick="vaciarTodo()">🗑️ Limpiar</button>
+                </div>
+            </div>
+
+            <div class="stats">
+                <div class="stat-card">
+                    <span id="statEstudios">0</span>
+                    <p>Estudios RX / TAC</p>
+                </div>
+                <div class="stat-card" style="border-bottom-color: var(--verde-medico);">
+                    <span id="statTraslados">0</span>
+                    <p>Traslados de Sala</p>
+                </div>
+                <div class="stat-card" style="border-bottom-color: #64748b;">
+                    <span id="statTotal">0</span>
+                    <p>Total Movimientos</p>
+                </div>
+            </div>
+
+            <div class="filters-grid">
+                <input type="text" id="fPaciente" class="filter-input" placeholder="Buscar paciente o DNI..." onkeyup="filtrar()">
+                <input type="text" id="fCamillero" class="filter-input" placeholder="Filtrar camillero..." onkeyup="filtrar()">
+                <select id="fTurno" class="filter-input" onchange="filtrar()">
+                    <option value="">Todos los Turnos</option>
+                    <option value="Mañana">Mañana</option>
+                    <option value="Tarde">Tarde</option>
+                    <option value="Noche">Noche</option>
+                    <option value="Franquero">Franquero</option>
+                </select>
+            </div>
+
+            <div class="table-container">
+                <table id="tablaHistorial">
+                    <thead>
+                        <tr>
+                            <th>Fecha/Hora</th>
+                            <th>Paciente / DNI</th>
+                            <th>Origen ➔ Tarea</th>
+                            <th>Personal / Turno</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cuerpoTabla">
+                        <tr><td colspan="5" style="text-align:center; padding: 40px; color: #94a3b8;">Esperando acceso...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAAaOmAIQ6GorJsSQAiFg-mUpnZJR2ivd4",
+            authDomain: "appguardia-8d02b.firebaseapp.com",
+            databaseURL: "https://appguardia-8d02b-default-rtdb.firebaseio.com",
+            projectId: "appguardia-8d02b",
+            storageBucket: "appguardia-8d02b.firebasestorage.app",
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        let masterData = [];
+
+        // FUNCIÓN DE LOGIN
+        document.getElementById('btnEntrar').onclick = () => {
+            const pass = document.getElementById('passInput').value;
+            if(pass === "Historial26") {
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('main-content').style.display = 'block';
+                escucharDB();
+            } else { 
+                alert("Clave incorrecta"); 
+            }
+        };
+
+        // Permite entrar con la tecla Enter
+        document.getElementById('passInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') document.getElementById('btnEntrar').click();
+        });
+
+        function escucharDB() {
+            onValue(ref(db, 'historial'), (snap) => {
+                const tbody = document.getElementById('cuerpoTabla');
+                if (snap.exists()) {
+                    masterData = Object.values(snap.val()).reverse();
+                    filtrar();
+                } else {
+                    tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding: 40px;'>Sin datos registrados.</td></tr>";
+                    actualizarStats(0, 0, 0);
+                }
+            });
+        }
+
+        window.filtrar = () => {
+            const p = document.getElementById('fPaciente').value.toLowerCase();
+            const c = document.getElementById('fCamillero').value.toLowerCase();
+            const t = document.getElementById('fTurno').value;
+
+            const filtrados = masterData.filter(item => {
+                const nombre = (item.paciente || "").toLowerCase();
+                const dni = (item.dni || "").toString();
+                const camillero = (item.camillero || "").toLowerCase();
+                const turnoItem = item.turnoObjetivo || item.turno || "";
+
+                const matchP = nombre.includes(p) || dni.includes(p);
+                const matchC = camillero.includes(c);
+                const matchT = t === "" || turnoItem === t;
+                
+                return matchP && matchC && matchT;
+            });
+
+            renderTabla(filtrados);
+        };
+
+        function renderTabla(lista) {
+            const tbody = document.getElementById('cuerpoTabla');
+            tbody.innerHTML = "";
+            let estudios = 0, traslados = 0;
+
+            lista.forEach(h => {
+                const esEstudio = /RX|TAC|ECO|RESONANCIA|TOMO/i.test(h.estudio || "");
+                esEstudio ? estudios++ : traslados++;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><b>${h.hora || '--:--'}</b><br><small>${h.horaFin || ''}</small></td>
+                    <td><b style="color:var(--azul-oscuro)">${h.paciente || 'S/N'}</b><br><small>DNI: ${h.dni || '---'}</small></td>
+                    <td><b>${h.origen || '---'}</b> ➔ <span class="${esEstudio ? 'tag-estudio' : ''}">${h.estudio || 'Traslado'}</span></td>
+                    <td><b>${h.camillero || '---'}</b><br><small>${h.turnoObjetivo || h.turno || ''}</small></td>
+                    <td><span class="badge-finalizado">ENTREGADO</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            actualizarStats(estudios, traslados, lista.length);
+        }
+
+        function actualizarStats(e, t, total) {
+            document.getElementById('statEstudios').innerText = e;
+            document.getElementById('statTraslados').innerText = t;
+            document.getElementById('statTotal').innerText = total;
+        }
+
+        window.exportarExcel = () => {
+            const wb = XLSX.utils.table_to_book(document.getElementById("tablaHistorial"));
+            XLSX.writeFile(wb, `Reporte_HHM_${new Date().toLocaleDateString()}.xlsx`);
+        };
+
+        window.vaciarTodo = () => {
+            if(confirm("¿Seguro que desea borrar permanentemente TODO el historial?") && confirm("¿Realmente seguro?")) {
+                remove(ref(db, 'historial')).then(() => {
+                    alert("Historial vaciado.");
+                });
+            }
+        };
+    </script>
+</body>
+</html>
